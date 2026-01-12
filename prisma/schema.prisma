@@ -1,0 +1,282 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+
+model LoginActivity {
+  id         Int       @id @default(autoincrement())
+  userId     String    @db.Uuid
+
+  name       String
+  loginTime  DateTime  @default(now())
+  logoutTime DateTime?
+  status     String
+  ip         String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("login_activity")
+}
+
+
+model User {
+  id          String    @id @default(uuid()) @db.Uuid
+  username    String    @unique
+  email       String?   @unique
+  password    String
+  name        String
+  role        String    // UserRole: SUPERADMIN, ADMIN_GUDANG, STAFF_GUDANG
+  jabatan     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  loginActivities        LoginActivity[]
+  transactions          Transaction[]
+  productionRequests    ProductionRequest[]
+  stockHistories        StockHistory[]
+  purchaseOrders       PurchaseOrder[]
+
+  @@map("user")
+}
+
+
+model Lead {
+  id                Int          @id @default(autoincrement())
+  nama_owner        String
+  nama_pic          String
+  nama_toko         String
+  jenis_customer    String       // PPN, Non-PPN
+  alamat_toko       String
+  alamat_gmaps      String?
+  no_telp           String
+  email             String?
+  payment_method    String       // Standard, Tempo
+  payment_status    String       // Belum Lunas, Sudah Lunas
+  is_delimited      Boolean      @default(false)
+  hasSpk            Boolean      @default(false) //Belum Ada SPK, Sudah Ada SPK
+
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+
+  sales_orders      SalesOrder[]    @relation("LeadToSalesOrder")
+  
+  @@map("leads")
+}
+
+model SalesOrder {
+  id                 Int      @id @default(autoincrement())
+  lead_id            Int
+  // Relasi opsional ke Item Inventory
+  inventory_item_id  String?  @db.Uuid 
+  is_custom          Boolean  @default(false)
+  
+  kode_barang        String   // Tetap simpan string untuk history jika item inventory dihapus
+  nama_barang        String
+  jenis_barang       String?  // Diambil dari ItemType
+  ukuran_barang      String?
+  spesifikasi_barang String?
+  quantity           Int
+  satuan             String   // Diambil dari Unit
+  harga              Float
+  tgl_order          DateTime @default(now())
+  catatan            String?
+  
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+  
+  lead               Lead     @relation("LeadToSalesOrder", fields: [lead_id], references: [id], onDelete: Cascade)
+  inventory_item     Item?    @relation("ItemToSalesOrder", fields: [inventory_item_id], references: [id])
+
+  @@map("sales_order")
+}
+
+model ItemType {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  category  String   // ItemCategory: BAHAN_BAKU, BARANG_JADI
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items Item[]
+
+  @@index([category])
+  @@map("item_type")
+}
+
+model Unit {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items Item[]
+
+  @@map("unit")
+}
+
+model Item {
+  id            String        @id @default(uuid()) @db.Uuid
+  code          String        @unique
+  name          String
+  itemTypeId    String        @db.Uuid
+  category      String        // ItemCategory: BAHAN_BAKU, BARANG_JADI
+  productGroup  String?       // ProductGroup: PLASTIK, SEDOTAN, ADIKTIF
+  unitId        String        @db.Uuid
+  stockMinimum  Float         @default(0)
+  currentStock  Float         @default(0)
+  isActive      Boolean       @default(true)
+  // Field untuk Bahan Baku
+  vendor        String?
+  hargaSatuan   Float?
+  // Field untuk Barang Jadi
+  ukuran        String?
+  kuantitas     Float?
+  // Field untuk Barang Trading
+  isTrading     Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  itemType      ItemType      @relation(fields: [itemTypeId], references: [id], onDelete: Restrict)
+  unit          Unit          @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  sales_orders  SalesOrder[]  @relation("ItemToSalesOrder")
+  transactions  Transaction[]
+  stockHistories StockHistory[]
+  productionRequestItems ProductionRequestItem[]
+
+  @@index([category])
+  @@index([productGroup])
+  @@index([isActive])
+  @@index([isTrading])
+}
+
+
+model Transaction {
+  id          String    @id @default(uuid()) @db.Uuid
+  date        DateTime
+  type        String    // TransactionType: MASUK, KELUAR
+  source      String?   // TransactionSource: PO, TRADING, PRODUKSI (for MASUK) | ORDER_CUSTOMER, BAHAN_BAKU, DAUR_ULANG (for KELUAR)
+  itemId      String    @db.Uuid
+  quantity    Float
+  price       Float?
+  vendor      String?
+  destination String?
+  spkNumber   String?
+  memo        String
+  userId      String    @db.Uuid
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  item        Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  stockHistories StockHistory[]
+
+  @@index([date])
+  @@index([type])
+  @@index([source])
+  @@index([itemId])
+  @@index([userId])
+  @@map("transaction")
+}
+
+model StockHistory {
+  id            String      @id @default(uuid()) @db.Uuid
+  itemId        String      @db.Uuid
+  transactionId String?     @db.Uuid
+  userId        String      @db.Uuid
+  previousStock Float
+  quantity      Float       // positive for masuk, negative for keluar
+  newStock      Float
+  reason        String
+  createdAt     DateTime    @default(now())
+
+  item          Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([itemId])
+  @@index([transactionId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("stock_history")
+}
+
+model ProductionRequest {
+  id          String      @id @default(uuid()) @db.Uuid
+  spkNumber   String      @unique
+  productName String
+  memo        String
+  status      String      // ProductionRequestStatus: PENDING, APPROVED, REJECTED, COMPLETED
+  userId      String      @db.Uuid
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items       ProductionRequestItem[]
+
+  @@index([status])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("production_request")
+}
+
+model ProductionRequestItem {
+  id                  String            @id @default(uuid()) @db.Uuid
+  productionRequestId String            @db.Uuid
+  itemId              String            @db.Uuid
+  quantity            Float
+  createdAt           DateTime          @default(now())
+
+  productionRequest   ProductionRequest @relation(fields: [productionRequestId], references: [id], onDelete: Cascade)
+  item                Item              @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([productionRequestId])
+  @@index([itemId])
+  @@map("production_request_item")
+}
+
+model PurchaseOrder {
+  id                String              @id @default(uuid()) @db.Uuid
+  kepada            String              // Vendor/Supplier name
+  nomorPO           String              @unique
+  tanggal           DateTime
+  jatuhTempo        DateTime
+  keteranganTambahan String?
+  hormatKami        String?
+  userId            String              @db.Uuid
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  user              User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items             PurchaseOrderItem[]
+
+  @@index([nomorPO])
+  @@index([userId])
+  @@index([tanggal])
+  @@map("purchase_order")
+}
+
+model PurchaseOrderItem {
+  id                String            @id @default(uuid()) @db.Uuid
+  purchaseOrderId   String            @db.Uuid
+  namaBarang        String
+  ukuran            String?
+  qty               Float
+  satuan            String
+  noticeMerkJenis   String?
+  subTotal          Float
+  createdAt         DateTime          @default(now())  purchaseOrder     PurchaseOrder     @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+  @@map("purchase_order_item")
+}
