@@ -1,26 +1,62 @@
 @import "tailwindcss";
 
+/* =========================
+   LIGHT MODE (DEFAULT)
+   ========================= */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* input */
+  --input-bg: #ffffff;
+  --input-text: #1f2937; /* gray-800 */
+  --placeholder: #9ca3af; /* gray-400 */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* =========================
+   DARK MODE (TAILWIND CLASS)
+   ========================= */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  /* input dark */
+  --input-bg: #111827; /* gray-900 */
+  --input-text: #e5e7eb; /* gray-200 */
+  --placeholder: #6b7280; /* gray-500 */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* =========================
+   BASE STYLE
+   ========================= */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* =========================
+   GLOBAL INPUT STYLE
+   ========================= */
+input,
+textarea,
+select {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  opacity: 1;
+}
+
+/* placeholder */
+input::placeholder,
+textarea::placeholder {
+  color: var(--placeholder);
+  opacity: 1;
+}
+
+/* focus */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  color: var(--input-text);
 }

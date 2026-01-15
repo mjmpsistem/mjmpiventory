@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import Breadcrumb from "@/components/Breadcrumb";
+import { formatCurrency } from "@/lib/utils";
 import {
   Package,
   Plus,
@@ -14,7 +15,9 @@ import {
   Filter,
   X,
   ShoppingBag,
+  Search,
 } from "lucide-react";
+import { SkeletonTable } from "@/components/ui/SkeletonTable";
 
 interface Item {
   id: string;
@@ -31,17 +34,20 @@ interface Item {
   ukuran?: string | null;
   kuantitas?: number | null;
   isTrading?: boolean;
+  transactions?: Array<{ quantity: number; price: number | null }>;
 }
 
 export default function DataBarangPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [itemTypes, setItemTypes] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [filterCategory, setFilterCategory] = useState("");
   const [step, setStep] = useState<"PILIH_KATEGORI" | "FORM">("PILIH_KATEGORI");
+  const [search, setSearch] = useState("");
 
   const [formData, setFormData] = useState({
     code: "",
@@ -66,23 +72,28 @@ export default function DataBarangPage() {
   ];
 
   useEffect(() => {
-    fetchItems();
-    fetchItemTypes();
-    fetchUnits();
+    fetchItems(false);
+  }, []);
+
+  useEffect(() => {
+    fetchItems(true);
   }, [filterCategory]);
 
-  const fetchItems = async () => {
+  const fetchItems = async (isRefetch = false) => {
+    isRefetch ? setRefetching(true) : setLoading(true);
+
     try {
       const url = filterCategory
         ? `/api/items?category=${filterCategory}`
         : "/api/items";
+
       const res = await fetch(url);
       const data = await res.json();
       setItems(data.items || []);
     } catch (error) {
-      console.error("Error fetching items:", error);
+      console.error(error);
     } finally {
-      setLoading(false);
+      isRefetch ? setRefetching(false) : setLoading(false);
     }
   };
 
@@ -100,6 +111,43 @@ export default function DataBarangPage() {
     const res = await fetch("/api/units?isActive=true");
     const data = await res.json();
     setUnits(data.units || []);
+  };
+
+  useEffect(() => {
+    if (showModal && step === "FORM") {
+      fetchUnits();
+    }
+  }, [showModal, step]);
+
+  const calculateWeightedAveragePrice = (item: Item): number => {
+    if (!item.transactions || item.transactions.length === 0) {
+      return 0;
+    }
+
+    let totalValue = 0;
+    let totalQuantity = 0;
+
+    for (const tx of item.transactions) {
+      if (tx.price && tx.price > 0 && tx.quantity > 0) {
+        totalValue += tx.quantity * tx.price;
+        totalQuantity += tx.quantity;
+      }
+    }
+
+    if (totalQuantity > 0) {
+      const avgPrice = totalValue / totalQuantity;
+      // Round to 2 decimal places to avoid floating point errors
+      return Math.round(avgPrice * 100) / 100;
+    }
+
+    return 0;
+  };
+
+  const getUnitPrice = (item: Item): number => {
+    if (item.hargaSatuan && item.hargaSatuan > 0) {
+      return item.hargaSatuan;
+    }
+    return calculateWeightedAveragePrice(item);
   };
 
   const fetchNextCode = async (category: string) => {
@@ -285,18 +333,24 @@ export default function DataBarangPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-            <p className="mt-4 text-gray-600">Memuat data...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  const columnCount =
+    filterCategory === "BARANG_JADI"
+      ? 8
+      : filterCategory === "BAHAN_BAKU"
+      ? 8
+      : 10;
+
+  const filteredItems = items.filter((item) => {
+    const keyword = search.toLowerCase().trim();
+
+    const matchSearch =
+      !keyword ||
+      item.name.toLowerCase().includes(keyword) ||
+      item.itemType?.name.toLowerCase().includes(keyword) ||
+      item.vendor?.toLowerCase().includes(keyword);
+
+    return matchSearch;
+  });
 
   return (
     <Layout>
@@ -306,35 +360,73 @@ export default function DataBarangPage() {
         {/* Header */}
 
         {/* Filter and Action Buttons */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3">
-          <div className="relative">
-            <Filter
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {/* LEFT: Search */}
+          <div className="relative w-full sm:w-72">
+            <Search
               className="absolute left-3 top-2.5 text-gray-400"
               size={18}
             />
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
-            >
-              <option value="">Semua Kategori</option>
-              <option value="BAHAN_BAKU">Bahan Baku</option>
-              <option value="BARANG_JADI">Barang Jadi</option>
-            </select>
+            <input
+              type="text"
+              placeholder="Cari nama / jenis / vendor..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="
+        w-full pl-10 pr-4 py-2
+        border border-gray-300 rounded-lg
+        focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+        bg-white text-sm
+        dark:bg-gray-800 dark:border-gray-700
+      "
+            />
           </div>
-          <button
-            onClick={() => {
-              setEditingItem(null);
-              resetForm();
-              setStep("PILIH_KATEGORI");
-              setGeneratedCode("");
-              setShowModal(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all font-medium"
-          >
-            <Plus size={18} />
-            Tambah Barang
-          </button>
+
+          {/* RIGHT: Filter + Action */}
+          <div className="flex items-center gap-3 justify-end">
+            <div className="relative">
+              <Filter
+                className="absolute left-3 top-2.5 text-gray-400"
+                size={18}
+              />
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="
+          pl-10 pr-4 py-2
+          border border-gray-300 rounded-lg
+          focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+          bg-white text-sm
+          dark:bg-gray-800 dark:border-gray-700
+        "
+              >
+                <option value="">Semua Kategori</option>
+                <option value="BAHAN_BAKU">Bahan Baku</option>
+                <option value="BARANG_JADI">Barang Jadi</option>
+              </select>
+            </div>
+
+            <button
+              onClick={() => {
+                setEditingItem(null);
+                resetForm();
+                setStep("PILIH_KATEGORI");
+                setGeneratedCode("");
+                setShowModal(true);
+              }}
+              className="
+        flex items-center gap-2
+        px-4 py-2
+        bg-gradient-to-r from-blue-600 to-indigo-600
+        text-white rounded-lg
+        hover:shadow-lg transition-all
+        font-medium
+      "
+            >
+              <Plus size={18} />
+              Tambah Barang
+            </button>
+          </div>
         </div>
 
         {/* Table */}
@@ -368,23 +460,27 @@ export default function DataBarangPage() {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Stok Minimum
                   </th>
-
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Harga Satuan
+                  </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Aksi
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {items.length === 0 ? (
+                {loading || refetching ? (
+                  /* ================= LOADING ================= */
+                  <tr>
+                    <td colSpan={columnCount} className="px-6 py-6">
+                      <SkeletonTable rows={8} cols={columnCount} />
+                    </td>
+                  </tr>
+                ) : filteredItems.length === 0 ? (
+                  /* ================= EMPTY ================= */
                   <tr>
                     <td
-                      colSpan={
-                        filterCategory === "BARANG_JADI"
-                          ? 7
-                          : filterCategory === "BAHAN_BAKU"
-                          ? 7
-                          : 9
-                      }
+                      colSpan={columnCount}
                       className="px-6 py-12 text-center"
                     >
                       <Package
@@ -400,7 +496,8 @@ export default function DataBarangPage() {
                     </td>
                   </tr>
                 ) : (
-                  items.map((item) => (
+                  /* ================= DATA ================= */
+                  filteredItems.map((item) => (
                     <tr
                       key={item.id}
                       className={`hover:bg-gray-50 transition-colors ${
@@ -419,16 +516,19 @@ export default function DataBarangPage() {
                           )}
                         </div>
                       </td>
+
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-900">
                           {item.name}
                         </span>
                       </td>
+
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-600">
                           {item.itemType.name}
                         </span>
                       </td>
+
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -442,47 +542,51 @@ export default function DataBarangPage() {
                             : "Barang Jadi"}
                         </span>
                       </td>
+
                       {(!filterCategory || filterCategory === "BAHAN_BAKU") && (
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm text-gray-600">
-                            {item.category === "BAHAN_BAKU"
-                              ? item.vendor || "-"
-                              : "-"}
+                            {item.vendor || "-"}
                           </span>
                         </td>
                       )}
+
                       {(!filterCategory ||
                         filterCategory === "BARANG_JADI") && (
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm text-gray-600">
-                            {item.category === "BARANG_JADI"
-                              ? item.ukuran || "-"
-                              : "-"}
+                            {item.ukuran || "-"}
                           </span>
                         </td>
                       )}
+
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm font-semibold text-gray-900">
                           {item.stockMinimum} {item.unit.name}
                         </span>
                       </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-medium text-gray-900">
+                          {formatCurrency(getUnitPrice(item))}
+                        </span>
+                      </td>
+
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => handleEdit(item)}
-                            className="text-blue-600 hover:text-blue-800 transition-colors"
-                            title="Edit"
+                            className="text-blue-600 hover:text-blue-800"
                           >
                             <Edit2 size={18} />
                           </button>
                           <button
                             onClick={() => handleToggleActive(item)}
-                            className={`transition-colors ${
+                            className={
                               item.isActive
                                 ? "text-red-600 hover:text-red-800"
                                 : "text-green-600 hover:text-green-800"
-                            }`}
-                            title={item.isActive ? "Nonaktifkan" : "Aktifkan"}
+                            }
                           >
                             <Power size={18} />
                           </button>
@@ -536,7 +640,8 @@ export default function DataBarangPage() {
                           category: cat,
                           itemTypeId: "",
                         });
-                        fetchItemTypes(cat); // 🔥 FILTER DI SINI
+                        fetchItemTypes(cat);
+                        fetchUnits(); // ⬅️ TAMBAHKAN INI
                         fetchNextCode(cat);
                         setStep("FORM");
                       }}

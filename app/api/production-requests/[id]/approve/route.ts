@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -12,10 +13,18 @@ import { Prisma } from "@prisma/client";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id?: string } }
 ) {
   try {
-    const { id } = params;
+    // ✅ AMAN: ambil id dari params ATAU fallback dari URL
+    const id = params?.id ?? request.nextUrl.pathname.split("/").at(-2);
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID permintaan produksi tidak valid" },
+        { status: 400 }
+      );
+    }
 
     const authUser = await requireAuth(request, [
       UserRole.SUPERADMIN,
@@ -47,12 +56,15 @@ export async function POST(
       );
     }
 
-    // Validasi stok
+    // ✅ VALIDASI STOK TERSEDIA
     for (const reqItem of productionRequest.items) {
-      if (reqItem.item.currentStock < reqItem.quantity) {
+      const availableStock =
+        reqItem.item.currentStock - (reqItem.item.reservedStock || 0);
+
+      if (availableStock < reqItem.quantity) {
         return NextResponse.json(
           {
-            error: `Stok ${reqItem.item.name} tidak mencukupi. Stok tersedia: ${reqItem.item.currentStock}`,
+            error: `Stok ${reqItem.item.name} tidak mencukupi. Stok tersedia: ${availableStock}`,
           },
           { status: 400 }
         );
@@ -63,7 +75,11 @@ export async function POST(
       async (tx: Prisma.TransactionClient) => {
         await tx.productionRequest.update({
           where: { id },
-          data: { status: ProductionRequestStatus.APPROVED },
+          data: {
+            status: ProductionRequestStatus.APPROVED,
+            isApproved: true,
+            approvedAt: new Date(),
+          },
         });
 
         const createdTransactions = [];
@@ -104,11 +120,8 @@ export async function POST(
       message: "Permintaan produksi berhasil disetujui",
       transactions,
     });
-  } catch (error: unknown) {
-    if (
-      error instanceof Error &&
-      (error.message === "Unauthorized" || error.message === "Forbidden")
-    ) {
+  } catch (error: any) {
+    if (error.message === "Unauthorized" || error.message === "Forbidden") {
       return NextResponse.json({ error: error.message }, { status: 403 });
     }
 

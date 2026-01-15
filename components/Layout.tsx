@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -24,6 +25,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { Sidebar } from "./Sidebar";
+import { Sun, Moon } from "lucide-react";
 
 interface User {
   id: string;
@@ -33,8 +35,23 @@ interface User {
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme");
+    const isDark = savedTheme === "dark";
+    setDarkMode(isDark);
+    document.documentElement.classList.toggle("dark", isDark);
+  }, []);
+
+  const toggleDarkMode = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  };
+
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
@@ -80,6 +97,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           title: "Purchase Order",
           href: "/transaksi/purchase-order",
           icon: ClipboardList,
+        },
+        {
+          title: "Approval Barang Jadi",
+          href: "/transaksi/approval-barang-jadi",
+          icon: CheckCircle,
         },
       ],
     },
@@ -138,6 +160,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             "Barang Masuk": "Kelola transaksi barang masuk",
             "Barang Keluar": "Kelola transaksi barang keluar",
             "Purchase Order": "Kelola Purchase Order (PO)",
+              "Approval Barang Jadi":
+                "Approve pengeluaran barang jadi berdasarkan SPK (FROM_STOCK)",
             "Daftar Permintaan": "Daftar permintaan produksi",
             Approval: "Review dan approve permintaan produksi",
             Stok: "Laporan stok barang",
@@ -211,8 +235,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       } catch {
         sessionStorage.removeItem("authUser");
         router.push("/login");
-      } finally {
-        if (isMounted) setLoading(false);
       }
     };
 
@@ -256,17 +278,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       setExpandedMenus([...expandedMenus, href]);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-          <p className="mt-4 text-gray-600">Memuat...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (!user) {
     return null;
@@ -477,7 +488,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           }`}
         >
           {/* Desktop Header */}
-          <header className="hidden lg:block bg-white border-b border-gray-200 shadow-sm sticky top-0 z-20">
+          <header
+            className="
+  hidden lg:block sticky top-0 z-20
+  bg-white/80 dark:bg-gray-900/80
+  backdrop-blur
+  border-b border-gray-200 dark:border-gray-800
+"
+          >
             <div className="flex items-center justify-between px-6 h-16">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white">
@@ -495,6 +513,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
               <div className="flex items-center gap-4">
+                {/* Dark Mode Toggle */}
+                <button
+                  onClick={toggleDarkMode}
+                  className="
+    p-2 rounded-lg
+    bg-gray-100 hover:bg-gray-200
+    dark:bg-gray-800 dark:hover:bg-gray-700
+    transition-colors
+  "
+                  title="Toggle dark mode"
+                >
+                  {darkMode ? (
+                    <Sun size={18} className="text-yellow-500" />
+                  ) : (
+                    <Moon size={18} className="text-gray-700" />
+                  )}
+                </button>
+
                 {/* User Dropdown */}
                 <div className="relative">
                   <button

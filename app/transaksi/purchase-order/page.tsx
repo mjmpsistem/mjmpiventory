@@ -6,6 +6,7 @@ import Layout from "@/components/Layout";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Plus, X, Edit2, Trash2, Printer, FileText } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb";
+import { SkeletonTable } from "@/components/ui/SkeletonTable";
 
 interface PurchaseOrderItem {
   id?: string;
@@ -36,6 +37,7 @@ export default function PurchaseOrderPage() {
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [itemsLoading, setItemsLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     kepada: "",
@@ -207,27 +209,37 @@ export default function PurchaseOrderPage() {
   };
 
   const handleEdit = (po: PurchaseOrder) => {
-    setEditingPO(po);
-    setFormData({
-      kepada: po.kepada,
-      nomorPO: po.nomorPO,
-      tanggal: po.tanggal.split("T")[0],
-      jatuhTempo: po.jatuhTempo.split("T")[0],
-      keteranganTambahan: po.keteranganTambahan || "",
-      hormatKami: po.hormatKami || "",
-    });
-    setItems(
-      po.items.map((item) => ({
-        id: item.id,
-        namaBarang: item.namaBarang,
-        ukuran: item.ukuran || "",
-        qty: item.qty,
-        satuan: item.satuan,
-        noticeMerkJenis: item.noticeMerkJenis || "",
-        subTotal: item.subTotal,
-      }))
-    );
-    setShowModal(true);
+    setItemsLoading(true); // ⬅️ WAJIB
+
+    setShowModal(true); // buka modal DULU biar skeleton keliatan
+
+    // kasih delay kecil supaya skeleton sempat render
+    setTimeout(() => {
+      setEditingPO(po);
+
+      setFormData({
+        kepada: po.kepada,
+        nomorPO: po.nomorPO,
+        tanggal: po.tanggal.split("T")[0],
+        jatuhTempo: po.jatuhTempo.split("T")[0],
+        keteranganTambahan: po.keteranganTambahan || "",
+        hormatKami: po.hormatKami || "",
+      });
+
+      setItems(
+        po.items.map((item) => ({
+          id: item.id,
+          namaBarang: item.namaBarang,
+          ukuran: item.ukuran || "",
+          qty: item.qty,
+          satuan: item.satuan,
+          noticeMerkJenis: item.noticeMerkJenis || "",
+          subTotal: item.subTotal,
+        }))
+      );
+
+      setItemsLoading(false); // ⬅️ MATIKAN SKELETON
+    }, 300); // 200–400ms ideal
   };
 
   const handleDelete = async (id: string) => {
@@ -252,19 +264,6 @@ export default function PurchaseOrderPage() {
   const handlePrint = (po: PurchaseOrder) => {
     window.open(`/transaksi/purchase-order/${po.id}/print`, "_blank");
   };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-            <p className="mt-4 text-gray-600">Memuat data...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -293,8 +292,9 @@ export default function PurchaseOrderPage() {
             {/* Reset */}
             <button
               onClick={() => {
-                setStartDate("");
-                setEndDate("");
+                setItemsLoading(false); // ⬅️ penting
+                resetForm();
+                setShowModal(true);
               }}
               className="h-10 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
             >
@@ -348,7 +348,15 @@ export default function PurchaseOrderPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {purchaseOrders.length === 0 ? (
+                {/* ================= LOADING ================= */}
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="p-0">
+                      <SkeletonTable rows={6} cols={7} />
+                    </td>
+                  </tr>
+                ) : purchaseOrders.length === 0 ? (
+                  /* ================= EMPTY ================= */
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center">
                       <FileText
@@ -364,11 +372,13 @@ export default function PurchaseOrderPage() {
                     </td>
                   </tr>
                 ) : (
+                  /* ================= DATA ================= */
                   purchaseOrders.map((po) => {
                     const total = po.items.reduce(
                       (sum, item) => sum + item.subTotal,
                       0
                     );
+
                     return (
                       <tr
                         key={po.id}
@@ -396,22 +406,19 @@ export default function PurchaseOrderPage() {
                           <div className="flex items-center gap-3">
                             <button
                               onClick={() => handlePrint(po)}
-                              className="text-blue-600 hover:text-blue-800 transition-colors"
-                              title="Cetak PDF"
+                              className="text-blue-600 hover:text-blue-800"
                             >
                               <Printer size={18} />
                             </button>
                             <button
                               onClick={() => handleEdit(po)}
-                              className="text-green-600 hover:text-green-800 transition-colors"
-                              title="Edit"
+                              className="text-green-600 hover:text-green-800"
                             >
                               <Edit2 size={18} />
                             </button>
                             <button
                               onClick={() => handleDelete(po.id)}
-                              className="text-red-600 hover:text-red-800 transition-colors"
-                              title="Hapus"
+                              className="text-red-600 hover:text-red-800"
                             >
                               <Trash2 size={18} />
                             </button>
@@ -552,120 +559,134 @@ export default function PurchaseOrderPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {items.map((item, index) => (
-                          <tr key={index}>
-                            <td className="px-3 py-2 border-b">
-                              <input
-                                type="text"
-                                required
-                                value={item.namaBarang}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    "namaBarang",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                placeholder="Nama barang"
-                              />
-                            </td>
-                            <td className="px-3 py-2 border-b">
-                              <input
-                                type="text"
-                                value={item.ukuran}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    "ukuran",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                placeholder="Ukuran"
-                              />
-                            </td>
-                            <td className="px-3 py-2 border-b">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                required
-                                value={item.qty || ""}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    "qty",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                placeholder="0"
-                              />
-                            </td>
-                            <td className="px-3 py-2 border-b">
-                              <input
-                                type="text"
-                                required
-                                value={item.satuan}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    "satuan",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                placeholder="Kg, Pcs, dll"
-                              />
-                            </td>
-                            <td className="px-3 py-2 border-b">
-                              <input
-                                type="text"
-                                value={item.noticeMerkJenis}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    "noticeMerkJenis",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                placeholder="Merk/Jenis"
-                              />
-                            </td>
-                            <td className="px-3 py-2 border-b">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                required
-                                value={item.subTotal || ""}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    "subTotal",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                placeholder="0"
-                              />
-                            </td>
-                            <td className="px-3 py-2 border-b">
-                              {items.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveItem(index)}
-                                  className="text-red-600 hover:text-red-800"
-                                >
-                                  <X size={16} />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {itemsLoading
+                          ? /* ================= ITEM SKELETON ================= */
+                            Array.from({ length: 3 }).map((_, i) => (
+                              <tr key={i}>
+                                {Array.from({ length: 7 }).map((__, j) => (
+                                  <td key={j} className="px-3 py-2 border-b">
+                                    <div className="h-8 bg-gray-200 rounded animate-pulse" />
+                                  </td>
+                                ))}
+                              </tr>
+                            ))
+                          : items.map((item, index) => (
+                              <tr key={index}>
+                                <td className="px-3 py-2 border-b">
+                                  <input
+                                    type="text"
+                                    required
+                                    value={item.namaBarang}
+                                    onChange={(e) =>
+                                      handleItemChange(
+                                        index,
+                                        "namaBarang",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    placeholder="Nama barang"
+                                  />
+                                </td>
+
+                                <td className="px-3 py-2 border-b">
+                                  <input
+                                    type="text"
+                                    value={item.ukuran}
+                                    onChange={(e) =>
+                                      handleItemChange(
+                                        index,
+                                        "ukuran",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    placeholder="Ukuran"
+                                  />
+                                </td>
+
+                                <td className="px-3 py-2 border-b">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    required
+                                    value={item.qty || ""}
+                                    onChange={(e) =>
+                                      handleItemChange(
+                                        index,
+                                        "qty",
+                                        parseFloat(e.target.value) || 0
+                                      )
+                                    }
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  />
+                                </td>
+
+                                <td className="px-3 py-2 border-b">
+                                  <input
+                                    type="text"
+                                    required
+                                    value={item.satuan}
+                                    onChange={(e) =>
+                                      handleItemChange(
+                                        index,
+                                        "satuan",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  />
+                                </td>
+
+                                <td className="px-3 py-2 border-b">
+                                  <input
+                                    type="text"
+                                    value={item.noticeMerkJenis}
+                                    onChange={(e) =>
+                                      handleItemChange(
+                                        index,
+                                        "noticeMerkJenis",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  />
+                                </td>
+
+                                <td className="px-3 py-2 border-b">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    required
+                                    value={item.subTotal || ""}
+                                    onChange={(e) =>
+                                      handleItemChange(
+                                        index,
+                                        "subTotal",
+                                        parseFloat(e.target.value) || 0
+                                      )
+                                    }
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  />
+                                </td>
+
+                                <td className="px-3 py-2 border-b">
+                                  {items.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveItem(index)}
+                                      className="text-red-600 hover:text-red-800"
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
                       </tbody>
+
                       <tfoot className="bg-gray-50">
                         <tr>
                           <td

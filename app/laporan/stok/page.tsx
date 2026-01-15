@@ -15,7 +15,9 @@ interface Item {
   unit: { name: string };
   stockMinimum: number;
   currentStock: number;
-  transactions?: Array<{ price: number | null }>;
+  reservedStock: number;
+  hargaSatuan?: number | null;
+  transactions?: Array<{ quantity: number; price: number | null }>;
 }
 
 export default function LaporanStokPage() {
@@ -52,10 +54,41 @@ export default function LaporanStokPage() {
     }
   };
 
+  const calculateWeightedAveragePrice = (item: Item): number => {
+    if (!item.transactions || item.transactions.length === 0) {
+      return 0;
+    }
+
+    let totalValue = 0;
+    let totalQuantity = 0;
+
+    for (const tx of item.transactions) {
+      if (tx.price && tx.price > 0 && tx.quantity > 0) {
+        totalValue += tx.quantity * tx.price;
+        totalQuantity += tx.quantity;
+      }
+    }
+
+    if (totalQuantity > 0) {
+      const avgPrice = totalValue / totalQuantity;
+      // Round to 2 decimal places to avoid floating point errors
+      return Math.round(avgPrice * 100) / 100;
+    }
+
+    return 0;
+  };
+
+  const getUnitPrice = (item: Item): number => {
+    if (item.hargaSatuan && item.hargaSatuan > 0) {
+      return item.hargaSatuan;
+    }
+    return calculateWeightedAveragePrice(item);
+  };
+
   const calculateTotalValue = () =>
     items.reduce((total, item) => {
-      const lastPrice = item.transactions?.[0]?.price || 0;
-      return total + item.currentStock * lastPrice;
+      const unitPrice = getUnitPrice(item);
+      return total + item.currentStock * unitPrice;
     }, 0);
 
   return (
@@ -128,8 +161,11 @@ export default function LaporanStokPage() {
                     "Nama Barang",
                     "Jenis",
                     "Kategori",
-                    "Stok",
+                    "Stok Fisik",
+                    "Reserved",
+                    "Stok Tersedia",
                     "Min",
+                    "Harga Satuan",
                     "Nilai Stok",
                   ].map((h) => (
                     <th
@@ -143,9 +179,12 @@ export default function LaporanStokPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {items.map((item) => {
-                  const lastPrice = item.transactions?.[0]?.price || 0;
-                  const stockValue = item.currentStock * lastPrice;
+                  const unitValue = getUnitPrice(item);
+                  // Round stock value to avoid floating point errors
+                  const stockValue =
+                    Math.round(item.currentStock * unitValue * 100) / 100;
                   const isLowStock = item.currentStock < item.stockMinimum;
+                  const availableStock = item.currentStock - item.reservedStock;
 
                   return (
                     <tr key={item.id} className={isLowStock ? "bg-red-50" : ""}>
@@ -168,8 +207,17 @@ export default function LaporanStokPage() {
                       <td className="px-6 py-4 text-sm font-semibold text-gray-900">
                         {item.currentStock} {item.unit.name}
                       </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {item.reservedStock} {item.unit.name}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-semibold text-gray-900">
+                        {availableStock} {item.unit.name}
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {item.stockMinimum} {item.unit.name}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right font-medium text-gray-900">
+                        {formatCurrency(unitValue)}
                       </td>
                       <td className="px-6 py-4 text-sm text-right font-medium text-gray-900">
                         {formatCurrency(stockValue)}

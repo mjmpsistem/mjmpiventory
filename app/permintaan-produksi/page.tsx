@@ -36,8 +36,43 @@ interface ProductionRequest {
   items: ProductionRequestItem[];
 }
 
+interface SpkItem {
+  id: string;
+  namaBarang: string;
+  qty: number;
+  satuan: string;
+  fulfillmentMethod: string;
+  fulfillmentStatus: string;
+  salesOrder: {
+    id: number;
+    nama_barang: string;
+  };
+}
+
+interface SpkProductionNeeded {
+  id: string;
+  spkNumber: string;
+  status: string;
+  tglSpk: string;
+  deadline: string | null;
+  catatan: string | null;
+  lead: {
+    id: number;
+    nama_toko: string;
+    nama_owner: string;
+    nama_pic: string;
+  };
+  user: {
+    id: string;
+    name: string;
+    username: string;
+  };
+  spkItems: SpkItem[];
+}
+
 export default function PermintaanProduksiPage() {
   const [requests, setRequests] = useState<ProductionRequest[]>([]);
+  const [spksNeedingProduction, setSpksNeedingProduction] = useState<SpkProductionNeeded[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -52,6 +87,7 @@ export default function PermintaanProduksiPage() {
 
   useEffect(() => {
     fetchRequests();
+    fetchSpksNeedingProduction();
     fetchItems();
   }, [filterStatus]);
 
@@ -67,6 +103,16 @@ export default function PermintaanProduksiPage() {
       console.error("Error fetching requests:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSpksNeedingProduction = async () => {
+    try {
+      const res = await fetch("/api/spk/production-needed");
+      const data = await res.json();
+      setSpksNeedingProduction(data.spks || []);
+    } catch (error) {
+      console.error("Error fetching SPKs needing production:", error);
     }
   };
 
@@ -125,6 +171,7 @@ export default function PermintaanProduksiPage() {
           items: [],
         });
         fetchRequests();
+        fetchSpksNeedingProduction();
       } else {
         const data = await res.json();
         alert(data.error || "Terjadi kesalahan");
@@ -151,6 +198,7 @@ export default function PermintaanProduksiPage() {
 
       if (res.ok) {
         fetchRequests();
+        fetchSpksNeedingProduction();
         alert("Permintaan disetujui dan transaksi dibuat");
       } else {
         const data = await res.json();
@@ -173,6 +221,7 @@ export default function PermintaanProduksiPage() {
 
       if (res.ok) {
         fetchRequests();
+        fetchSpksNeedingProduction();
       } else {
         const data = await res.json();
         alert(data.error || "Terjadi kesalahan");
@@ -250,8 +299,74 @@ export default function PermintaanProduksiPage() {
           </div>
         </div>
 
+        {/* SPK yang Perlu Produksi (belum ada ProductionRequest) */}
+        {spksNeedingProduction.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            <h2 className="text-lg font-semibold text-blue-900 mb-4">
+              SPK yang Perlu Produksi (Belum Ada Permintaan)
+            </h2>
+            <div className="space-y-4">
+              {spksNeedingProduction.map((spk) => (
+                <div
+                  key={spk.id}
+                  className="bg-white rounded-lg border border-blue-200 p-4"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        {spk.spkNumber}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Customer: {spk.lead.nama_toko}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Tanggal SPK: {formatDate(spk.tglSpk)}
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
+                      {spk.status}
+                    </span>
+                  </div>
+                  <div className="mb-3">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      Barang yang Perlu Diproduksi:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1">
+                      {spk.spkItems.map((item) => (
+                        <li key={item.id} className="text-sm text-gray-600">
+                          {item.namaBarang} - {item.qty} {item.satuan}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {spk.catatan && (
+                    <div className="mb-3 p-2 bg-gray-50 rounded text-sm text-gray-600">
+                      <span className="font-medium">Catatan:</span> {spk.catatan}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      // Pre-fill form dengan data SPK
+                      setFormData({
+                        spkNumber: spk.spkNumber,
+                        productName: spk.spkItems.map(i => i.namaBarang).join(", "),
+                        memo: spk.catatan || `Produksi untuk SPK ${spk.spkNumber}`,
+                        items: [],
+                      });
+                      setShowModal(true);
+                    }}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                  >
+                    Buat Permintaan Produksi untuk SPK ini
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Requests List */}
-        {requests.length === 0 ? (
+        {requests.length === 0 && spksNeedingProduction.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
             <ClipboardList className="mx-auto text-gray-400 mb-4" size={48} />
             <p className="text-gray-600 font-medium">

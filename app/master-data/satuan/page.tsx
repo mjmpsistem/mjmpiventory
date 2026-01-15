@@ -1,9 +1,13 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-unused-expressions */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import { Ruler, Plus, Edit2, Power, X } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb";
+import { SkeletonTable } from "@/components/ui/SkeletonTable";
 
 interface Unit {
   id: string;
@@ -16,17 +20,18 @@ const DEFAULT_UNITS = ["Kg", "Pcs", "Roll", "Ball", "Pack"];
 export default function SatuanPage() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [name, setName] = useState("");
 
-  const fetchUnits = async () => {
+  const fetchUnits = async (isRefetch = false) => {
     try {
-      setLoading(true);
+      isRefetch ? setRefetching(true) : setLoading(true);
+
       const res = await fetch("/api/units");
       const data = await res.json();
 
-      // 🔐 NORMALISASI DATA
       const unitsArray = Array.isArray(data)
         ? data
         : Array.isArray(data.units)
@@ -35,15 +40,14 @@ export default function SatuanPage() {
 
       setUnits(unitsArray);
 
-      // Buat default units kalau kosong
-      if (unitsArray.length === 0) {
+      if (unitsArray.length === 0 && !isRefetch) {
         await createDefaultUnits();
       }
     } catch (error) {
       console.error("Error fetching units:", error);
-      setUnits([]); // ⬅️ PENTING
+      setUnits([]);
     } finally {
-      setLoading(false);
+      isRefetch ? setRefetching(false) : setLoading(false);
     }
   };
 
@@ -60,7 +64,7 @@ export default function SatuanPage() {
           body: JSON.stringify({ name: unitName }),
         });
       }
-      fetchUnits();
+      await fetchUnits(true);
     } catch (error) {
       console.error("Error creating default units:", error);
     }
@@ -130,19 +134,6 @@ export default function SatuanPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-            <p className="mt-4 text-gray-600">Memuat data...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
       <div className="space-y-6">
@@ -180,7 +171,15 @@ export default function SatuanPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {units.length === 0 ? (
+                {loading || refetching ? (
+                  /* ================= LOADING ================= */
+                  <tr>
+                    <td colSpan={3} className="p-0">
+                      <SkeletonTable rows={6} cols={3} />
+                    </td>
+                  </tr>
+                ) : units.length === 0 ? (
+                  /* ================= EMPTY ================= */
                   <tr>
                     <td colSpan={3} className="px-6 py-12 text-center">
                       <Ruler className="mx-auto text-gray-400 mb-3" size={48} />
@@ -193,6 +192,7 @@ export default function SatuanPage() {
                     </td>
                   </tr>
                 ) : (
+                  /* ================= DATA ================= */
                   units.map((unit) => (
                     <tr
                       key={unit.id}
@@ -205,6 +205,7 @@ export default function SatuanPage() {
                           {unit.name}
                         </span>
                       </td>
+
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -216,6 +217,7 @@ export default function SatuanPage() {
                           {unit.isActive ? "Aktif" : "Tidak Aktif"}
                         </span>
                       </td>
+
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-3">
                           <button

@@ -136,24 +136,44 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // Nilai stok (harga terakhir * stok)
+    // Nilai stok akumulatif (weighted average price * stok)
+    // Menghitung rata-rata tertimbang dari semua transaksi masuk dengan harga
     const itemsWithPrice = await prisma.item.findMany({
       where: { isActive: true },
       include: {
         transactions: {
           where: {
+            type: TransactionType.MASUK,
             price: { not: null },
           },
-          orderBy: { date: 'desc' },
-          take: 1,
+          orderBy: { date: 'asc' },
+          select: {
+            quantity: true,
+            price: true,
+          },
         },
       },
     })
 
     let totalNilaiStok = 0
     for (const item of itemsWithPrice) {
-      const lastPrice = item.transactions[0]?.price || 0
-      totalNilaiStok += item.currentStock * lastPrice
+      if (item.currentStock === 0) continue
+
+      // Hitung weighted average price dari semua transaksi masuk
+      let totalValue = 0
+      let totalQuantity = 0
+      
+      for (const tx of item.transactions) {
+        if (tx.price && tx.price > 0 && tx.quantity > 0) {
+          totalValue += tx.quantity * tx.price
+          totalQuantity += tx.quantity
+        }
+      }
+
+      const weightedAvgPrice = totalQuantity > 0 ? totalValue / totalQuantity : 0
+      const hargaSatuan = item.hargaSatuan && item.hargaSatuan > 0 ? item.hargaSatuan : weightedAvgPrice
+      const stockValue = Math.round(item.currentStock * hargaSatuan * 100) / 100
+      totalNilaiStok += stockValue
     }
 
     return NextResponse.json({

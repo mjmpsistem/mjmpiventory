@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
@@ -7,6 +8,7 @@ import Layout from "@/components/Layout";
 import { Tag, Plus, Edit2, Power, X, Filter } from "lucide-react";
 import { ItemCategory } from "@/lib/constants";
 import Breadcrumb from "@/components/Breadcrumb";
+import { SkeletonTable } from "@/components/ui/SkeletonTable";
 
 interface ItemType {
   id: string;
@@ -19,6 +21,7 @@ export default function JenisBarangPage() {
   const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
   const [filteredItemTypes, setFilteredItemTypes] = useState<ItemType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingItemType, setEditingItemType] = useState<ItemType | null>(null);
   const [name, setName] = useState("");
@@ -39,15 +42,16 @@ export default function JenisBarangPage() {
     }
   }, [filterCategory, itemTypes]);
 
-  const fetchItemTypes = async () => {
+  const fetchItemTypes = async (isRefetch = false) => {
     try {
+      isRefetch ? setRefetching(true) : setLoading(true);
       const res = await fetch("/api/item-types?includeInactive=true");
       const data = await res.json();
       setItemTypes(data.itemTypes || []);
     } catch (error) {
-      console.error("Error fetching item types:", error);
+      console.error(error);
     } finally {
-      setLoading(false);
+      isRefetch ? setRefetching(false) : setLoading(false);
     }
   };
 
@@ -130,19 +134,6 @@ export default function JenisBarangPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-            <p className="mt-4 text-gray-600">Memuat data...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
       <div className="space-y-6">
@@ -199,7 +190,13 @@ export default function JenisBarangPage() {
               </thead>
 
               <tbody className="divide-y divide-gray-200">
-                {filteredItemTypes.length === 0 ? (
+                {loading || refetching ? (
+                  <tr>
+                    <td colSpan={4} className="p-0">
+                      <SkeletonTable rows={8} cols={4} />
+                    </td>
+                  </tr>
+                ) : filteredItemTypes.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-6 py-16 text-center">
                       <Tag className="mx-auto text-gray-400 mb-3" size={48} />

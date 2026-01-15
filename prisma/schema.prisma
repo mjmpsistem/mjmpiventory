@@ -39,11 +39,12 @@ model User {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  loginActivities        LoginActivity[]
+  loginActivities       LoginActivity[]
   transactions          Transaction[]
   productionRequests    ProductionRequest[]
   stockHistories        StockHistory[]
-  purchaseOrders       PurchaseOrder[]
+  purchaseOrders        PurchaseOrder[]
+  spks                  Spk[]
 
   @@map("user")
 }
@@ -68,6 +69,7 @@ model Lead {
   updated_at        DateTime     @updatedAt
 
   sales_orders      SalesOrder[]    @relation("LeadToSalesOrder")
+  spks              Spk[]
   
   @@map("leads")
 }
@@ -95,8 +97,99 @@ model SalesOrder {
   
   lead               Lead     @relation("LeadToSalesOrder", fields: [lead_id], references: [id], onDelete: Cascade)
   inventory_item     Item?    @relation("ItemToSalesOrder", fields: [inventory_item_id], references: [id])
+  spkItems           SpkItem[]
 
   @@map("sales_order")
+}
+
+model Spk {
+  id           String   @id @default(uuid()) @db.Uuid
+  spkNumber    String   @unique // Contoh: SPK/2026/01/001 - Digunakan untuk Invoice & Shipping
+  
+  // Relasi ke Pelanggan
+  leadId       Int
+  lead         Lead     @relation(fields: [leadId], references: [id])
+  
+  // Header Info
+  tglSpk       DateTime @default(now())
+  deadline     DateTime?
+  catatan      String?  // Field catatan opsional sesuai poin #5
+  
+  // Tracking Progress
+  // Status: QUEUE, IN_PROGRESS, QC_CHECK, COMPLETED, CANCELLED
+  status       String   @default("QUEUE") 
+  
+  // Audit Creator
+  userId       String   @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  // Item-item di dalam SPK ini (diambil dari SalesOrder)
+  spkItems     SpkItem[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status])
+  @@index([spkNumber])
+  @@map("spk")
+}
+
+// --- MODEL SPK ITEM (DETAIL PER BARANG) ---
+model SpkItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  spkId        String   @db.Uuid
+  spk          Spk      @relation(fields: [spkId], references: [id], onDelete: Cascade)
+
+  // Mengikat ke baris item SalesOrder asli
+  salesOrderId Int
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id])
+
+  // Snapshot Data (Agar history aman jika SO berubah)
+  namaBarang   String
+  qty          Float
+  satuan       String
+
+  // METODE PEMENUHAN (Poin #1 & #4)
+  // Jalur: FROM_STOCK (Langsung QC), PRODUCTION (Kirim ke Produksi), TRADING (Beli Vendor)
+  fulfillmentMethod String @default("FROM_STOCK")
+
+  // JIKA FROM_STOCK: Link ke Item inventory
+  itemId String? @db.Uuid
+  item   Item?  @relation("ItemToSpkItem", fields: [itemId], references: [id])
+
+  // STATUS FULFILLMENT: PENDING, RESERVED, FULFILLED, CANCELLED
+  // PENDING: Belum di-reserve (SPK masih QUEUE)
+  // RESERVED: Stok sudah di-reserve (SPK IN_PROGRESS, stok dikunci tapi belum diambil)
+  // FULFILLED: Barang sudah diambil dari gudang (stok fisik sudah dikurangi)
+  // CANCELLED: SPK dibatalkan, reserved stock sudah di-release
+  fulfillmentStatus String @default("PENDING")
+
+  // JIKA PRODUCTION: Hubungkan ke pencatatan bahan baku
+  materialUsages    SpkMaterialUsage[]
+
+  // JIKA PRODUCTION: Bisa ditrack ke ProductionRequest internal (Opsional)
+  productionRequestId String? @db.Uuid
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("spk_item")
+}
+
+// --- MODEL PENCATATAN BAHAN BAKU (MATERIAL USAGE) ---
+model SpkMaterialUsage {
+  id            String   @id @default(uuid()) @db.Uuid
+  spkItemId     String   @db.Uuid
+  spkItem       SpkItem  @relation(fields: [spkItemId], references: [id], onDelete: Cascade)
+
+  // Link ke Bahan Baku di Inventory (Biji Plastik, dll)
+  materialId    String   @db.Uuid
+  material      Item     @relation("MaterialToSpk", fields: [materialId], references: [id])
+  
+  quantityNeeded Float
+  isSufficient   Boolean  @default(true) // Pengecekan stok bahan baku cukup/tidak
+
+  @@map("spk_material_usage")
 }
 
 model ItemType {
@@ -135,6 +228,7 @@ model Item {
   unitId        String        @db.Uuid
   stockMinimum  Float         @default(0)
   currentStock  Float         @default(0)
+  reservedStock Float         @default(0) // Stok yang sudah di-reserve oleh SPK IN_PROGRESS
   isActive      Boolean       @default(true)
   // Field untuk Bahan Baku
   vendor        String?
@@ -153,6 +247,8 @@ model Item {
   transactions  Transaction[]
   stockHistories StockHistory[]
   productionRequestItems ProductionRequestItem[]
+  spkMaterials  SpkMaterialUsage[] @relation("MaterialToSpk")
+  spkItems      SpkItem[] @relation("ItemToSpkItem")
 
   @@index([category])
   @@index([productGroup])
@@ -216,6 +312,8 @@ model ProductionRequest {
   spkNumber   String      @unique
   productName String
   memo        String
+  isApproved  Boolean     @default(false)
+  approvedAt  DateTime?
   status      String      // ProductionRequestStatus: PENDING, APPROVED, REJECTED, COMPLETED
   userId      String      @db.Uuid
   createdAt   DateTime    @default(now())
@@ -275,7 +373,9 @@ model PurchaseOrderItem {
   satuan            String
   noticeMerkJenis   String?
   subTotal          Float
-  createdAt         DateTime          @default(now())  purchaseOrder     PurchaseOrder     @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  createdAt         DateTime          @default(now())  
+  
+  purchaseOrder     PurchaseOrder     @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
   @@index([purchaseOrderId])
   @@map("purchase_order_item")

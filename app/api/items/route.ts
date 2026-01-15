@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { UserRole } from '@/lib/constants'
+import { UserRole, TransactionType } from '@/lib/constants'
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,11 +26,12 @@ export async function GET(request: NextRequest) {
         unit: true,
         transactions: {
           where: {
+            type: TransactionType.MASUK,
             price: { not: null },
           },
-          orderBy: { date: 'desc' },
-          take: 1,
+          orderBy: { date: 'asc' },
           select: {
+            quantity: true,
             price: true,
           },
         },

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { updateStock } from "@/lib/stock";
+import { updateStock, getAvailableStock } from "@/lib/stock";
 import {
   UserRole,
   ProductionRequestStatus,
@@ -19,10 +19,15 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
+    const approvedOnly = searchParams.get("approvedOnly");
 
     const where: any = {};
     if (status) {
       where.status = status;
+    }
+    if (approvedOnly === "true") {
+      where.status = ProductionRequestStatus.APPROVED;
+      where.isApproved = true;
     }
 
     const requests = await prisma.productionRequest.findMany({
@@ -86,7 +91,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate stock availability
+    // Validate stock availability (gunakan availableStock untuk konsistensi)
     for (const item of items) {
       const dbItem = await prisma.item.findUnique({
         where: { id: item.itemId },
@@ -97,50 +102,86 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (dbItem.currentStock < item.quantity) {
+      
+      // Gunakan availableStock (currentStock - reservedStock)
+      const availableStock = dbItem.currentStock - dbItem.reservedStock;
+      if (availableStock < item.quantity) {
         return NextResponse.json(
           {
-            error: `Stok ${dbItem.name} tidak mencukupi. Stok tersedia: ${dbItem.currentStock}`,
+            error: `Stok ${dbItem.name} tidak mencukupi. Stok tersedia: ${availableStock}, dibutuhkan: ${item.quantity}`,
           },
           { status: 400 }
         );
       }
     }
 
-    // Create production request
-    const productionRequest = await prisma.productionRequest.create({
-      data: {
-        spkNumber,
-        productName,
-        memo,
-        userId: authUser.userId,
-        status: ProductionRequestStatus.PENDING,
-        items: {
-          create: items.map((item: any) => ({
-            itemId: item.itemId,
-            quantity: item.quantity,
-          })),
-        },
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
+    // Create production request dan link ke SpkItem
+    const productionRequest = await prisma.$transaction(async (tx) => {
+      // Create production request
+      const newRequest = await tx.productionRequest.create({
+        data: {
+          spkNumber,
+          productName,
+          memo,
+          userId: authUser.userId,
+          status: ProductionRequestStatus.PENDING,
+          items: {
+            create: items.map((item: any) => ({
+              itemId: item.itemId,
+              quantity: item.quantity,
+            })),
           },
         },
-        items: {
-          include: {
-            item: {
-              include: {
-                itemType: true,
-                unit: true,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+            },
+          },
+          items: {
+            include: {
+              item: {
+                include: {
+                  itemType: true,
+                  unit: true,
+                },
               },
             },
           },
         },
-      },
+      });
+
+      // Update SpkItem dengan productionRequestId
+      // Cari SPK berdasarkan spkNumber
+      const spk = await tx.spk.findUnique({
+        where: { spkNumber },
+        include: {
+          spkItems: {
+            where: {
+              fulfillmentMethod: "PRODUCTION",
+              productionRequestId: null,
+            },
+          },
+        },
+      });
+
+      if (spk) {
+        // Update semua SpkItem dengan fulfillmentMethod = PRODUCTION yang belum punya productionRequestId
+        await tx.spkItem.updateMany({
+          where: {
+            spkId: spk.id,
+            fulfillmentMethod: "PRODUCTION",
+            productionRequestId: null,
+          },
+          data: {
+            productionRequestId: newRequest.id,
+          },
+        });
+      }
+
+      return newRequest;
     });
 
     return NextResponse.json({ productionRequest }, { status: 201 });

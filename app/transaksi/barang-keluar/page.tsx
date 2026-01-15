@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
 import { formatDate } from "@/lib/utils";
 import { ItemCategory, TransactionSource } from "@/lib/constants";
-import { Plus, X, Filter, Package, Recycle } from "lucide-react";
+import { Plus, X, Filter, Package } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb";
+import { SkeletonTable } from "@/components/ui/SkeletonTable";
 
 interface Item {
   id: string;
@@ -40,6 +41,8 @@ export default function BarangKeluarPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("ALL");
+  const [showMemoModal, setShowMemoModal] = useState(false);
+  const [selectedMemo, setSelectedMemo] = useState("");
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
@@ -229,19 +232,6 @@ export default function BarangKeluarPage() {
     resetForm();
   };
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-            <p className="mt-4 text-gray-600">Memuat data...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
       <div className="space-y-6">
@@ -338,7 +328,15 @@ export default function BarangKeluarPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTransactions.length === 0 ? (
+                {loading ? (
+                  /* ================= LOADING ================= */
+                  <tr>
+                    <td colSpan={8} className="p-0">
+                      <SkeletonTable rows={6} cols={8} />
+                    </td>
+                  </tr>
+                ) : filteredTransactions.length === 0 ? (
+                  /* ================= EMPTY ================= */
                   <tr>
                     <td colSpan={8} className="px-6 py-12 text-center">
                       <Package
@@ -383,7 +381,7 @@ export default function BarangKeluarPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">
                         {tx.quantity} {tx.item.unit.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -398,9 +396,22 @@ export default function BarangKeluarPage() {
                           "-"
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                        {tx.memo}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {tx.memo ? (
+                          <button
+                            onClick={() => {
+                              setSelectedMemo(tx.memo);
+                              setShowMemoModal(true);
+                            }}
+                            className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                          >
+                            Lihat Memo
+                          </button>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
+
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {tx.user.name}
                       </td>
@@ -409,6 +420,38 @@ export default function BarangKeluarPage() {
                 )}
               </tbody>
             </table>
+            {showMemoModal && (
+              <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-xl max-w-lg w-full">
+                  <div className="flex items-center justify-between px-6 py-4 border-b">
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      Detail Memo
+                    </h3>
+                    <button
+                      onClick={() => setShowMemoModal(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <div className="px-6 py-4">
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                      {selectedMemo}
+                    </p>
+                  </div>
+
+                  <div className="px-6 py-4 border-t flex justify-end">
+                    <button
+                      onClick={() => setShowMemoModal(false)}
+                      className="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-md transition-all text-sm font-medium"
+                    >
+                      Tutup
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

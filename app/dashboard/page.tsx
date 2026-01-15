@@ -18,6 +18,9 @@ import {
   FileText,
 } from "lucide-react";
 import Link from "next/link";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { SkeletonCard } from "@/components/ui/SkeletonCard";
+import { SkeletonTable } from "@/components/ui/SkeletonTable";
 
 interface StockItem {
   id: string;
@@ -83,6 +86,7 @@ export default function DashboardPage() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -90,29 +94,69 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     try {
-      setLoading(true);
+      if (!data) {
+        setLoading(true); // first load
+      } else {
+        setRefetching(true); // filter / refresh
+      }
+
       const url = date ? `/api/dashboard?date=${date}` : "/api/dashboard";
       const res = await fetch(url);
       const result = await res.json();
+
       if (res.ok) {
         setData(result);
-      } else {
-        console.error("Error fetching dashboard:", result.error);
       }
     } catch (error) {
-      console.error("Error fetching dashboard:", error);
+      console.error(error);
     } finally {
       setLoading(false);
+      setRefetching(false);
     }
   };
 
   if (loading && !data) {
     return (
       <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-            <p className="mt-4 text-gray-600">Memuat data dashboard...</p>
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Breadcrumb */}
+          <Skeleton className="h-5 w-40" />
+
+          {/* Header */}
+          <div className="flex justify-between">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-10 w-10 rounded-lg" />
+          </div>
+
+          {/* Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+
+          {/* Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Stok Minimum */}
+            <div className="bg-white dark:bg-gray-900 rounded-2xl p-6">
+              <Skeleton className="h-5 w-40 mb-4" />
+              <SkeletonTable rows={5} cols={3} />
+            </div>
+
+            {/* Nilai Stok */}
+            <div className="bg-white dark:bg-gray-900 rounded-2xl p-10 text-center space-y-4">
+              <Skeleton className="h-20 w-20 mx-auto rounded-2xl" />
+              <Skeleton className="h-8 w-40 mx-auto" />
+              <Skeleton className="h-4 w-56 mx-auto" />
+            </div>
+
+            {/* Aktivitas */}
+            <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 space-y-4">
+              <Skeleton className="h-5 w-40" />
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
           </div>
         </div>
       </Layout>
@@ -221,7 +265,7 @@ export default function DashboardPage() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <Breadcrumb />
 
         {/* Header */}
@@ -248,33 +292,33 @@ export default function DashboardPage() {
 
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {statCards.map((stat, i) => (
-            <div
-              key={i}
-              className="relative bg-white rounded-2xl p-6 shadow-sm
-                 hover:shadow-lg hover:-translate-y-0.5 transition-all"
-            >
-              <div
-                className={`absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-gradient-to-r ${stat.gradient}`}
-              />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{stat.title}</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {stat.value}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">{stat.subtitle}</p>
-                </div>
-
+          {refetching
+            ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
+            : statCards.map((stat, i) => (
                 <div
-                  className={`p-3 rounded-xl bg-gradient-to-br ${stat.gradient} text-white shadow`}
+                  key={i}
+                  className="relative bg-white rounded-2xl p-6 shadow-sm
+          hover:shadow-lg hover:-translate-y-0.5 transition-all"
                 >
-                  <stat.icon size={26} />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-500">{stat.title}</p>
+                      <p className="text-3xl font-bold text-gray-900 mt-1">
+                        {stat.value}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {stat.subtitle}
+                      </p>
+                    </div>
+
+                    <div
+                      className={`p-3 rounded-xl bg-gradient-to-br ${stat.gradient} text-white shadow`}
+                    >
+                      <stat.icon size={26} />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
+              ))}
         </div>
 
         {/* Content */}
@@ -291,7 +335,9 @@ export default function DashboardPage() {
             </div>
 
             <div className="p-6">
-              {data.stokBawahMinimum.length === 0 ? (
+              {refetching ? (
+                <SkeletonTable rows={5} cols={3} />
+              ) : data.stokBawahMinimum.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="inline-flex w-14 h-14 items-center justify-center rounded-full bg-green-100 mb-3">
                     <AlertTriangle className="text-green-600" size={22} />
@@ -317,9 +363,9 @@ export default function DashboardPage() {
                       <tr
                         key={item.id}
                         className={`
-                ${i % 2 === 0 ? "bg-red-50/50" : ""}
-                hover:bg-red-50 transition
-              `}
+              ${i % 2 === 0 ? "bg-red-50/50" : ""}
+              hover:bg-red-50 transition
+            `}
                       >
                         <td className="py-3">
                           <p className="font-medium text-gray-900">
@@ -352,18 +398,26 @@ export default function DashboardPage() {
               <h3 className="font-semibold text-gray-900">Nilai Stok Total</h3>
             </div>
 
-            <div className="p-10 text-center">
-              <div className="inline-flex w-20 h-20 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 mb-4 shadow-lg">
-                <DollarSign className="text-white" size={40} />
+            {refetching ? (
+              <div className="p-10 text-center space-y-4">
+                <Skeleton className="h-20 w-20 mx-auto rounded-2xl" />
+                <Skeleton className="h-8 w-40 mx-auto" />
+                <Skeleton className="h-4 w-56 mx-auto" />
               </div>
+            ) : (
+              <div className="p-10 text-center">
+                <div className="inline-flex w-20 h-20 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 mb-4 shadow-lg">
+                  <DollarSign className="text-white" size={40} />
+                </div>
 
-              <p className="text-4xl font-extrabold text-gray-900 tracking-tight">
-                {formatCurrency(data.totalNilaiStok)}
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                Berdasarkan harga transaksi terakhir
-              </p>
-            </div>
+                <p className="text-4xl font-extrabold text-gray-900 tracking-tight">
+                  {formatCurrency(data.totalNilaiStok)}
+                </p>
+                <p className="text-sm text-gray-500 mt-2">
+                  Berdasarkan rata-rata tertimbang harga pembelian
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Aktivitas Terbaru */}
@@ -376,33 +430,37 @@ export default function DashboardPage() {
             </div>
 
             <div className="p-6 space-y-3">
-              {allActivities.map((activity) => {
-                const Icon = activity.icon;
-                return (
-                  <Link
-                    key={activity.id}
-                    href={activity.href}
-                    className="block p-4 rounded-xl hover:bg-gray-50 transition"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-xl ${activity.bgColor}`}>
-                        <Icon size={16} className={activity.color} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">
-                          {activity.title}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {activity.description}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {formatDate(activity.date)} • {activity.user}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
+              {refetching
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-xl" />
+                  ))
+                : allActivities.map((activity) => {
+                    const Icon = activity.icon;
+                    return (
+                      <Link
+                        key={activity.id}
+                        href={activity.href}
+                        className="block p-4 rounded-xl hover:bg-gray-50 transition"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-xl ${activity.bgColor}`}>
+                            <Icon size={16} className={activity.color} />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900">
+                              {activity.title}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {activity.description}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {formatDate(activity.date)} • {activity.user}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
             </div>
           </div>
         </div>
