@@ -43,7 +43,7 @@ async function main() {
     await prisma.itemType.upsert({
       where: { name: itemType.name },
       update: {},
-      create: itemType,
+      create: { ...itemType, category: 'BAHAN_BAKU' },
     })
   }
 

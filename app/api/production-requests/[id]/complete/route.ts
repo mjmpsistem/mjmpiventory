@@ -5,12 +5,19 @@ import { ProductionRequestStatus, UserRole } from "@/lib/constants";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
 
-    requireAuth(request, [UserRole.SUPERADMIN, UserRole.ADMIN_GUDANG]);
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID permintaan produksi tidak valid" },
+        { status: 400 },
+      );
+    }
+
+    await requireAuth(request, [UserRole.SUPERADMIN, UserRole.ADMIN_GUDANG]);
 
     const productionRequest = await prisma.productionRequest.findUnique({
       where: { id },
@@ -19,14 +26,14 @@ export async function POST(
     if (!productionRequest) {
       return NextResponse.json(
         { error: "Permintaan tidak ditemukan" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (productionRequest.status !== ProductionRequestStatus.APPROVED) {
       return NextResponse.json(
         { error: "Hanya permintaan APPROVED yang dapat diselesaikan" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -48,10 +55,10 @@ export async function POST(
     }
 
     console.error("Complete production request error:", error);
+
     return NextResponse.json(
       { error: "Terjadi kesalahan saat menyelesaikan permintaan produksi" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

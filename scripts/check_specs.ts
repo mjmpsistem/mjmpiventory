@@ -36,7 +36,7 @@ async function main() {
       console.log(`  - Item: ${item.namaBarang}`);
       if (item.salesOrder) {
         console.log(`    > SalesOrder ID: ${item.salesOrder.id}`);
-        console.log(`    > Spec: "${item.salesOrder.spesifikasi_barang}"`);
+        console.log(`    > Spec: "${item.salesOrder.spesifikasi_tambahan}"`);
       } else {
         console.log(`    > [FAIL] No Linked Sales Order (salesOrderId might be null)`);
       }
@@ -62,7 +62,7 @@ async function main() {
         for (const item of spk.spkItems) {
              console.log(`  - Item: ${item.namaBarang}`);
              if (item.salesOrder) {
-                console.log(`    > Spec: "${item.salesOrder.spesifikasi_barang}"`);
+                console.log(`    > Spec: "${item.salesOrder.spesifikasi_tambahan}"`);
              } else {
                  console.log(`    > [FAIL] No Linked Sales Order`);
              }

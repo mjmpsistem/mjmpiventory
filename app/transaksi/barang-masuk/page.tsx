@@ -252,73 +252,67 @@ export default function BarangMasukPage() {
         <Breadcrumb />
         {/* Header */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Filter size={18} className="text-gray-500" />
+          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+            <div className="flex items-center gap-3 flex-1 flex-wrap">
+              <Filter size={18} className="text-gray-500 shrink-0" />
 
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="h-10 px-4 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">Semua Kategori</option>
-              <option value={ItemCategory.BAHAN_BAKU}>Bahan Baku</option>
-              <option value={ItemCategory.BARANG_JADI}>Barang Jadi</option>
-            </select>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="h-10 px-4 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 flex-1 md:flex-initial min-w-[140px]"
+              >
+                <option value="ALL">Semua Kategori</option>
+                <option value={ItemCategory.BAHAN_BAKU}>Bahan Baku</option>
+                <option value={ItemCategory.BARANG_JADI}>Barang Jadi</option>
+              </select>
 
-            {/* Search */}
-            <div className="relative">
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cari barang / kode / jenis..."
-                className="
-      h-10 w-64
-      pl-10 pr-4
-      border border-gray-300 rounded-lg
-      text-sm
-      focus:ring-2 focus:ring-blue-500
-      focus:border-blue-500
-    "
-              />
-              <Search
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
+              <div className="relative flex-1 md:min-w-[240px]">
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Cari barang / kode / jenis..."
+                  className="h-10 w-full pl-10 pr-4 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <Search
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="h-10 px-3 border border-gray-300 rounded-lg text-sm"
-              />
-              <span className="text-gray-400">—</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="h-10 px-3 border border-gray-300 rounded-lg text-sm"
-              />
-            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 flex-1 md:flex-initial">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="h-10 flex-1 md:w-40 px-3 border border-gray-300 rounded-lg text-sm"
+                />
+                <span className="text-gray-400">—</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="h-10 flex-1 md:w-40 px-3 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
 
-            <button
-              onClick={() => {
-                setStartDate("");
-                setEndDate("");
-              }}
-              className="h-10 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
-            >
-              Reset
-            </button>
+              <button
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                className="h-10 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+              >
+                Reset
+              </button>
 
-            <div className="ml-auto">
               <button
                 onClick={() => setShowModal(true)}
-                className="h-10 inline-flex items-center gap-2 px-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-md transition-all text-sm font-semibold"
+                className="h-10 flex-1 lg:flex-initial inline-flex items-center justify-center gap-2 px-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-md transition-all text-sm font-semibold whitespace-nowrap"
               >
                 <Plus size={18} />
-                Tambah Barang Masuk
+                <span>Tambah</span>
               </button>
             </div>
           </div>

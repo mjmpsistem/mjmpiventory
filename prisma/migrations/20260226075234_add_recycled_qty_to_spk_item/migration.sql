@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "spk_item" ADD COLUMN     "recycledQty" DOUBLE PRECISION NOT NULL DEFAULT 0;

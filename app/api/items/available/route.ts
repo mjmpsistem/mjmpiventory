@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Add availableStock to each item
     const itemsWithAvailableStock = await Promise.all(
       items.map(async (item) => {
-        const availableStock = item.currentStock - item.reservedStock;
+        const availableStock = item.currentStock;
         return {
           ...item,
           availableStock,

@@ -33,6 +33,7 @@ export default function Breadcrumb() {
       approval: "Approval",
       laporan: "Laporan",
       stok: "Stok",
+      waste: "Monitoring Waste",
       "tentang-aplikasi": "Tentang Aplikasi",
     };
 
@@ -93,29 +94,29 @@ export default function Breadcrumb() {
           return (
             <li key={crumb.href} className="flex items-center gap-2">
               {index === 0 ? (
-                <Link
-                  href={crumb.href}
-                  className="flex items-center gap-1 text-gray-500 hover:text-blue-600 transition-colors"
-                >
-                  <Home size={16} />
-                </Link>
-              ) : (
-                <>
-                  <ChevronRight size={16} className="text-gray-400" />
-                  {isLast ? (
-                    <span className="font-semibold text-gray-900">
-                      {crumb.label}
-                    </span>
-                  ) : (
-                    <Link
-                      href={crumb.href}
-                      className="text-gray-500 hover:text-blue-600 transition-colors"
-                    >
-                      {crumb.label}
-                    </Link>
-                  )}
-                </>
-              )}
+                  <Link
+                    href={crumb.href}
+                    className="flex items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  >
+                    <Home size={16} />
+                  </Link>
+                ) : (
+                  <>
+                    <ChevronRight size={16} className="text-gray-400 dark:text-gray-600" />
+                    {isLast ? (
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {crumb.label}
+                      </span>
+                    ) : (
+                      <Link
+                        href={crumb.href}
+                        className="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      >
+                        {crumb.label}
+                      </Link>
+                    )}
+                  </>
+                )}
             </li>
           );
         })}

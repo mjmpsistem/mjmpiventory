@@ -16,6 +16,7 @@ interface MenuChildItem {
   title: string;
   href: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
+  badge?: number;
 }
 
 interface MenuItem extends MenuChildItem {
@@ -56,7 +57,7 @@ export function Sidebar({
             onClick={() => toggleMenu(item.href)}
             className={`
               relative w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all
-              ${active || isExpanded ? "bg-blue-800 text-white shadow-lg" : "text-gray-700 hover:bg-blue-200 hover:text-blue-900"}
+              ${active || isExpanded ? "bg-blue-800 text-white shadow-lg" : "text-gray-700 dark:text-gray-300 hover:bg-blue-200 dark:hover:bg-blue-900/40 hover:text-blue-900 dark:hover:text-blue-100"}
               ${!sidebarOpen ? "justify-center" : ""}
             `}
             title={!sidebarOpen ? item.title : ""}
@@ -73,11 +74,22 @@ export function Sidebar({
               className="flex-shrink-0 transition-transform group-hover:scale-110"
             />
 
+            {!sidebarOpen && item.badge ? (
+              <span className="absolute top-2 right-2 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                {item.badge > 99 ? "99+" : item.badge}
+              </span>
+            ) : null}
+
             {sidebarOpen && (
               <>
                 <span className="flex-1 text-left font-medium">
                   {item.title}
                 </span>
+                {item.badge ? (
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                    {item.badge > 99 ? "99+" : item.badge}
+                  </span>
+                ) : null}
                 <ChevronDown
                   size={16}
                   className={`transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
@@ -93,7 +105,7 @@ export function Sidebar({
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.25, ease: "easeOut" }}
-                className="ml-4 mt-1 space-y-1 border-l border-gray-300/40 pl-3"
+                className="ml-4 mt-1 space-y-1 border-l border-gray-300/40 dark:border-gray-700/50 pl-3"
               >
                 {item.children!.map((child) => {
                   const childActive = isActive(child.href);
@@ -104,7 +116,7 @@ export function Sidebar({
                       prefetch={false}
                       className={`
                         relative flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-all duration-200
-                        ${childActive ? "bg-blue-800 text-white shadow-md" : "text-gray-700 hover:bg-blue-200 hover:text-blue-900"}
+                        ${childActive ? "bg-blue-800 text-white shadow-md" : "text-gray-700 dark:text-gray-300 hover:bg-blue-200 dark:hover:bg-blue-900/40 hover:text-blue-900 dark:hover:text-blue-100"}
                       `}
                       title={!sidebarOpen ? child.title : ""}
                     >
@@ -115,7 +127,12 @@ export function Sidebar({
                         />
                       )}
                       <child.icon size={16} />
-                      {sidebarOpen && <span>{child.title}</span>}
+                      {sidebarOpen && <span className="flex-1">{child.title}</span>}
+                      {child.badge ? (
+                        <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                          {child.badge > 99 ? '99+' : child.badge}
+                        </span>
+                      ) : null}
                     </Link>
                   );
                 })}
@@ -133,7 +150,7 @@ export function Sidebar({
         prefetch={false}
         className={`
           relative group flex items-center gap-3 px-4 py-3 rounded-xl transition-all
-          ${active ? "bg-blue-800 text-white shadow-lg" : "text-gray-700 hover:bg-blue-200 hover:text-blue-900"}
+          ${active ? "bg-blue-800 text-white shadow-lg" : "text-gray-700 dark:text-gray-300 hover:bg-blue-200 dark:hover:bg-blue-900/40 hover:text-blue-900 dark:hover:text-blue-100"}
           ${!sidebarOpen ? "justify-center" : ""}
         `}
         title={!sidebarOpen ? item.title : ""}
@@ -145,16 +162,24 @@ export function Sidebar({
           />
         )}
         <item.icon size={20} />
-        {sidebarOpen && <span className="font-medium">{item.title}</span>}
+        {sidebarOpen && <span className="flex-1 font-medium">{item.title}</span>}
+        {item.badge ? (
+          <span className={`
+            bg-red-500 text-white text-[10px] font-bold rounded-full text-center
+            ${sidebarOpen ? 'px-1.5 py-0.5 min-w-[20px]' : 'absolute top-2 right-2 w-4 h-4 flex items-center justify-center'}
+          `}>
+            {item.badge > 99 ? '99+' : item.badge}
+          </span>
+        ) : null}
       </Link>
     );
   };
 
   return (
     <motion.aside
-      animate={{ width: sidebarOpen ? 260 : 88 }}
+      animate={{ width: sidebarOpen ? 256 : 80 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="hidden lg:flex flex-col fixed h-screen z-30 shadow-lg border-r border-gray-200"
+      className="hidden lg:flex flex-col fixed h-screen z-30 shadow-lg border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-[#020617]"
     >
       {/* HEADER */}
       <div
@@ -184,7 +209,7 @@ export function Sidebar({
              drop-shadow-lg
              transition-transform duration-300 hover:scale-105"
             >
-              Inventory
+              MJMP Inventory
             </span>
           </motion.div>
         )}
@@ -199,11 +224,11 @@ export function Sidebar({
       </div>
 
       {/* MENU */}
-      <nav className="flex-1 overflow-y-auto p-3 bg-gray-50 space-y-1 shadow-inner">
+      <nav className="flex-1 overflow-y-auto p-3 bg-gray-50 dark:bg-[#020617] space-y-1 shadow-inner">
         {menuItems.map(renderMenuItem)}
       </nav>
       {/* USER FOOTER */}
-      <div className="mt-auto p-3 bg-gray-100 rounded-md">
+      <div className="mt-auto p-3 bg-gray-100 dark:bg-slate-900 border-t dark:border-gray-800">
         <div
           className={`flex items-center gap-2 ${!sidebarOpen ? "justify-center" : ""}`}
         >
@@ -217,7 +242,7 @@ export function Sidebar({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -6 }}
             >
-              <p className="text-sm font-medium text-gray-900">{user.name}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.name}</p>
               <p className="text-xs text-gray-500">{user.role}</p>
             </motion.div>
           )}

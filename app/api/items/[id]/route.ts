@@ -57,6 +57,9 @@ export async function PUT(
       vendor,
       hargaSatuan,
       ukuran,
+      warna,
+      ketebalan,
+      spesifikasi_tambahan,
       kuantitas,
       isTrading,
     } = body
@@ -100,6 +103,9 @@ export async function PUT(
     // Field khusus untuk Barang Jadi
     if (category === 'BARANG_JADI') {
       itemData.ukuran = ukuran !== undefined ? (ukuran || null) : existingItem.ukuran
+      itemData.warna = warna !== undefined ? (warna || null) : existingItem.warna
+      itemData.ketebalan = ketebalan !== undefined ? (ketebalan || null) : existingItem.ketebalan
+      itemData.spesifikasi_tambahan = spesifikasi_tambahan !== undefined ? (spesifikasi_tambahan || null) : existingItem.spesifikasi_tambahan
       itemData.kuantitas = kuantitas !== undefined ? (kuantitas || null) : existingItem.kuantitas
       // Reset field bahan baku
       itemData.vendor = null

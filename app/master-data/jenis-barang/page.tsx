@@ -7,7 +7,7 @@ import { toast } from "react-toastify";
 
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
-import { Tag, Plus, Edit2, Power, X, Filter } from "lucide-react";
+import { Tag, Plus, Edit2, Power, X, Filter, Search } from "lucide-react";
 import { ItemCategory } from "@/lib/constants";
 import Breadcrumb from "@/components/Breadcrumb";
 import { SkeletonTable } from "@/components/ui/SkeletonTable";
@@ -115,8 +115,8 @@ export default function JenisBarangPage() {
       const method = editingItemType ? "PUT" : "POST";
 
       const body: any = { name };
-      // Hanya kirim category saat tambah baru, tidak saat edit
-      if (!editingItemType && category) {
+      // Kirim category baik saat tambah baru maupun edit
+      if (category) {
         body.category = category;
       }
 
@@ -194,8 +194,8 @@ export default function JenisBarangPage() {
     <Layout>
       <div className="space-y-6">
         <Breadcrumb />
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* Header and Filters */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
           <button
             onClick={() => {
               setEditingItemType(null);
@@ -203,53 +203,56 @@ export default function JenisBarangPage() {
               setCategory("");
               setShowModal(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all font-medium"
+            className="w-full lg:w-auto h-11 flex items-center justify-center gap-2 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition-all font-bold text-sm active:scale-95"
           >
             <Plus size={18} />
             Tambah Jenis Barang
           </button>
 
-          {/* Filter */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full lg:w-auto">
             {/* SEARCH */}
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari nama jenis barang..."
-              className="
-      px-4 py-2
-      border border-gray-300
-      rounded-lg
-      w-53
-      focus:ring-2 focus:ring-blue-500
-      focus:border-blue-500
-    "
-            />
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari nama..."
+                className="w-full h-11 pl-10 pr-4 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition-all"
+              />
+            </div>
 
             {/* FILTER KATEGORI */}
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg bg-white"
-            >
-              <option value="ALL">Semua Kategori</option>
-              <option value={ItemCategory.BAHAN_BAKU}>Bahan Baku</option>
-              <option value={ItemCategory.BARANG_JADI}>Barang Jadi</option>
-            </select>
+            <div className="relative w-full">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="w-full h-11 pl-10 pr-8 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition-all appearance-none"
+              >
+                <option value="ALL">Semua Kategori</option>
+                <option value={ItemCategory.BAHAN_BAKU}>Bahan Baku</option>
+                <option value={ItemCategory.BARANG_JADI}>Barang Jadi</option>
+              </select>
+            </div>
 
             {/* FILTER STATUS */}
-            <select
-              value={filterStatus}
-              onChange={(e) =>
-                setFilterStatus(e.target.value as "ALL" | "ACTIVE" | "INACTIVE")
-              }
-              className="px-4 py-2 border border-gray-300 rounded-lg bg-white"
-            >
-              <option value="ALL">Semua Status</option>
-              <option value="ACTIVE">Aktif</option>
-              <option value="INACTIVE">Tidak Aktif</option>
-            </select>
+            <div className="relative w-full">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400">
+                <Power size={16} />
+              </div>
+              <select
+                value={filterStatus}
+                onChange={(e) =>
+                  setFilterStatus(e.target.value as "ALL" | "ACTIVE" | "INACTIVE")
+                }
+                className="w-full h-11 pl-10 pr-8 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition-all appearance-none"
+              >
+                <option value="ALL">Semua Status</option>
+                <option value="ACTIVE">Aktif</option>
+                <option value="INACTIVE">Tidak Aktif</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -545,27 +548,25 @@ export default function JenisBarangPage() {
                 </button>
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                {!editingItemType && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Kategori *
-                    </label>
-                    <select
-                      required={!editingItemType}
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Pilih Kategori</option>
-                      <option value={ItemCategory.BAHAN_BAKU}>
-                        Bahan Baku
-                      </option>
-                      <option value={ItemCategory.BARANG_JADI}>
-                        Barang Jadi
-                      </option>
-                    </select>
-                  </div>
-                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Kategori *
+                  </label>
+                  <select
+                    required
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Pilih Kategori</option>
+                    <option value={ItemCategory.BAHAN_BAKU}>
+                      Bahan Baku
+                    </option>
+                    <option value={ItemCategory.BARANG_JADI}>
+                      Barang Jadi
+                    </option>
+                  </select>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Nama Jenis Barang *

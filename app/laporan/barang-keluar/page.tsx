@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import { useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
 import { formatDate } from "@/lib/utils";
-import { Filter, PackageMinus, FileText } from "lucide-react";
+import { Filter, PackageMinus, FileText, Package, X } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb";
 import { SkeletonTable } from "@/components/ui/SkeletonTable";
 
@@ -24,6 +24,7 @@ interface Transaction {
   quantity: number;
   destination: string | null;
   spkNumber: string | null;
+  source: string | null;
   memo: string;
   user: { name: string };
 }
@@ -118,6 +119,7 @@ export default function LaporanBarangKeluarPage() {
         "Qty",
         "Satuan",
         "Tujuan",
+        "Sumber",
         "SPK",
         "Harga Satuan",
         "Total Harga",
@@ -137,6 +139,7 @@ export default function LaporanBarangKeluarPage() {
           tx.quantity,
           tx.item?.unit?.name ?? "",
           tx.destination ?? "",
+          tx.source ?? "-",
           tx.spkNumber ?? "",
           hargaSatuan,
           totalHarga,
@@ -251,7 +254,7 @@ export default function LaporanBarangKeluarPage() {
           </div>
 
           {/* Fields */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {/* Start Date */}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-gray-600">
@@ -318,8 +321,17 @@ export default function LaporanBarangKeluarPage() {
           {loading ? (
             <SkeletonTable rows={6} cols={7} />
           ) : paginatedData.length === 0 ? (
-            <div className="py-16 text-center text-sm text-gray-500">
-              Data transaksi tidak ditemukan
+            <div className="px-6 py-12 text-center">
+              <Package
+                className="mx-auto text-gray-400 mb-3"
+                size={48}
+              />
+              <p className="text-gray-600 font-medium">
+                Tidak ada data transaksi barang keluar
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                Silakan sesuaikan filter atau cari kata kunci lain
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -331,13 +343,14 @@ export default function LaporanBarangKeluarPage() {
                       "Barang",
                       "Qty",
                       "Tujuan",
+                      "Sumber",
                       "SPK",
                       "Memo",
                       "User",
                     ].map((h) => (
                       <th
                         key={h}
-                        className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500"
+                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky top-0 bg-gradient-to-r from-gray-50 to-gray-100 z-10"
                       >
                         {h}
                       </th>
@@ -369,32 +382,43 @@ export default function LaporanBarangKeluarPage() {
                         {tx.quantity} {tx.item.unit.name}
                       </td>
 
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-gray-600 font-medium">
                         {tx.destination || "-"}
                       </td>
 
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-gray-700">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          tx.source === 'REPACK' ? 'bg-indigo-100 text-indigo-700' :
+                          tx.source === 'SHIPPING' ? 'bg-blue-100 text-blue-700' :
+                          tx.source === 'WASTE' ? 'bg-rose-100 text-rose-700' :
+                          tx.source === 'PRODUKSI' ? 'bg-emerald-100 text-emerald-700' :
+                          tx.source === 'DAUR_ULANG' ? 'bg-amber-100 text-amber-700' :
+                          tx.source === 'BAHAN_BAKU' ? 'bg-orange-100 text-orange-700' :
+                          tx.source === 'ORDER_CUSTOMER' ? 'bg-purple-100 text-purple-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {tx.source || "UMUM"}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 text-sm text-gray-600 font-semibold text-blue-600">
                         {tx.spkNumber || "-"}
                       </td>
 
                       {/* Memo button */}
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {tx.memo ? (
                           <button
                             onClick={() => {
                               setSelectedMemo(tx.memo);
                               setOpenMemo(true);
                             }}
-                            className="text-gray-400 hover:text-blue-600 transition"
-                            title="Lihat Memo"
+                            className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
                           >
-                            <FileText
-                              size={16}
-                              className="transition-transform group-hover:scale-110"
-                            />
+                            Lihat
                           </button>
                         ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                          <span className="text-gray-400">—</span>
                         )}
                       </td>
 

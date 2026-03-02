@@ -14,20 +14,21 @@ export async function GET(request: NextRequest) {
 
     const leads = await prisma.lead.findMany({
       include: {
-        sales_orders: {
+        so_headers: {
           where: {
-            // Hanya ambil sales order yang belum ada di SPK
-            spkItems: {
-              none: {},
-            },
+            hasSpk: false
           },
           include: {
-            inventory_item: {
+            items: {
               include: {
-                itemType: true,
-                unit: true,
+                inventory_item: {
+                  include: {
+                    itemType: true,
+                    unit: true,
+                  },
+                },
               },
-            },
+            }
           },
         },
       },

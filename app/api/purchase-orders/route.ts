@@ -83,6 +83,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Calculate total amount
+    const totalAmount = items.reduce((sum: number, item: any) => sum + (parseFloat(item.subTotal) || 0), 0);
+
     // Create purchase order
     const purchaseOrder = await prisma.purchaseOrder.create({
       data: {
@@ -95,6 +98,12 @@ export async function POST(request: NextRequest) {
         userId: authUser.userId,
         spkId: spkId || null,
         status: status || "PENDING",
+        paymentMethod: body.paymentMethod || "CASH",
+        paymentTerm: body.paymentTerm || "7",
+        totalAmount,
+        paidAmount: 0,
+        paymentStatus: "UNPAID",
+        isReceived: false,
         items: {
           create: items.map((item: any) => ({
             namaBarang: item.namaBarang,
@@ -117,6 +126,22 @@ export async function POST(request: NextRequest) {
         items: true,
       },
     })
+
+    // ✅ CREATE NOTIFICATION
+    try {
+      console.log(`[NOTIFICATION_LOG] Creating notification for Purchase Order: #${nomorPO}`);
+      const poNotification = await prisma.notification.create({
+        data: {
+          title: "Purchase Order Baru",
+          message: `PO #${nomorPO} untuk ${kepada}`,
+          type: "INFO",
+          targetUrl: "/transaksi/purchase-order",
+        },
+      });
+      console.log(`[NOTIFICATION_LOG] Notification created successfully with ID: ${poNotification.id}`);
+    } catch (notifyError: any) {
+      console.error("[NOTIFICATION_LOG] Failed to create notification for PO:", notifyError.message || notifyError);
+    }
 
     return NextResponse.json({ purchaseOrder }, { status: 201 })
   } catch (error: any) {

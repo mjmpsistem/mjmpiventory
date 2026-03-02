@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { PackagePlus, Filter, FileText } from "lucide-react";
+import { PackagePlus, Filter, FileText, Package, X } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb";
 import { SkeletonTable } from "@/components/ui/SkeletonTable";
 
@@ -25,6 +25,7 @@ interface Transaction {
   quantity: number;
   price: number | null;
   vendor: string | null;
+  source: string | null;
   memo: string;
   user: { name: string };
 }
@@ -130,6 +131,7 @@ export default function LaporanBarangMasukPage() {
         "Harga Satuan",
         "Total Harga",
         "Vendor",
+        "Sumber",
         "User",
         "Memo",
       ];
@@ -148,6 +150,7 @@ export default function LaporanBarangMasukPage() {
           hargaSatuan,
           totalHarga,
           tx.vendor ?? "",
+          tx.source ?? "-",
           tx.user?.name ?? "",
           tx.memo ?? "",
         ];
@@ -300,7 +303,7 @@ export default function LaporanBarangMasukPage() {
           </div>
 
           {/* Fields */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-6 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
             {/* Tanggal Mulai */}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -332,7 +335,7 @@ export default function LaporanBarangMasukPage() {
             </div>
 
             {/* Search */}
-            <div className="space-y-1 md:col-span-2">
+            <div className="space-y-1 sm:col-span-2 lg:col-span-2">
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
                 Cari Barang
               </label>
@@ -393,8 +396,17 @@ export default function LaporanBarangMasukPage() {
           {loading ? (
             <SkeletonTable rows={6} cols={8} />
           ) : totalItems === 0 ? (
-            <div className="py-16 text-center text-sm text-gray-500 dark:text-gray-400">
-              Data transaksi tidak ditemukan
+            <div className="px-6 py-12 text-center">
+              <Package
+                className="mx-auto text-gray-400 mb-3"
+                size={48}
+              />
+              <p className="text-gray-600 font-medium">
+                Tidak ada data transaksi barang masuk
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                Silakan sesuaikan filter atau cari kata kunci lain
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -409,13 +421,13 @@ export default function LaporanBarangMasukPage() {
                       "Harga Satuan",
                       "Total Harga",
                       "Vendor",
+                      "Sumber",
                       "Memo",
                       "User",
                     ].map((h) => (
                       <th
                         key={h}
-                        className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider
-    text-gray-500 dark:text-gray-400"
+                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky top-0 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 z-10"
                       >
                         {h}
                       </th>
@@ -459,24 +471,36 @@ export default function LaporanBarangMasukPage() {
                           : "-"}
                       </td>
 
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-600 dark:text-gray-400">
                         {tx.vendor || "-"}
                       </td>
 
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          tx.source === 'PO' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                          tx.source === 'RETUR' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                          tx.source === 'PRODUKSI' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                          tx.source === 'TRADING' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
+                          tx.source === 'DAUR_ULANG' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                          'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                        }`}>
+                          {tx.source || "UMUM"}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {tx.memo ? (
                           <button
                             onClick={() => {
                               setSelectedMemo(tx.memo);
                               setOpenMemo(true);
                             }}
-                            className="text-gray-400 hover:text-emerald-600 transition"
-                            title="Lihat Memo"
+                            className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
                           >
-                            <FileText size={18} />
+                            Lihat Memo
                           </button>
                         ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                          <span className="text-gray-400">—</span>
                         )}
                       </td>
 

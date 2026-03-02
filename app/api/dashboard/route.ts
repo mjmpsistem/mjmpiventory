@@ -8,13 +8,25 @@ export async function GET(request: NextRequest) {
     requireAuth(request, [UserRole.SUPERADMIN, UserRole.ADMIN_GUDANG, UserRole.STAFF_GUDANG])
     
     const { searchParams } = new URL(request.url)
-    const date = searchParams.get('date')
+    const dateParam = searchParams.get('date')
+    const fromParam = searchParams.get('from')
+    const toParam = searchParams.get('to')
 
-    const today = date ? new Date(date) : new Date()
-    const startOfDay = new Date(today)
-    startOfDay.setHours(0, 0, 0, 0)
-    const endOfDay = new Date(today)
-    endOfDay.setHours(23, 59, 59, 999)
+    const today = dateParam ? new Date(dateParam) : new Date()
+    let startOfDay: Date
+    let endOfDay: Date
+
+    if (fromParam && toParam) {
+      startOfDay = new Date(fromParam)
+      startOfDay.setHours(0, 0, 0, 0)
+      endOfDay = new Date(toParam)
+      endOfDay.setHours(23, 59, 59, 999)
+    } else {
+      startOfDay = new Date(today)
+      startOfDay.setHours(0, 0, 0, 0)
+      endOfDay = new Date(today)
+      endOfDay.setHours(23, 59, 59, 999)
+    }
 
     // Total stok bahan baku
     const bahanBakuItems = await prisma.item.findMany({
@@ -54,7 +66,7 @@ export async function GET(request: NextRequest) {
       (item) => item.currentStock < item.stockMinimum
     )
 
-    // Barang masuk hari ini
+    // Barang masuk periode ini
     const barangMasukHariIni = await prisma.transaction.aggregate({
       where: {
         type: TransactionType.MASUK,
@@ -71,7 +83,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // Barang keluar hari ini
+    // Barang keluar periode ini
     const barangKeluarHariIni = await prisma.transaction.aggregate({
       where: {
         type: TransactionType.KELUAR,
@@ -185,15 +197,15 @@ export async function GET(request: NextRequest) {
 
     // ========== DATA BARU ==========
     
-    // 1. Top 5 barang paling sering keluar (30 hari terakhir)
-    const thirtyDaysAgo = new Date(today)
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    
+    // 1. Top 5 barang paling sering keluar (dalam periode)
     const topBarangKeluar = await prisma.transaction.groupBy({
       by: ['itemId'],
       where: {
         type: TransactionType.KELUAR,
-        date: { gte: thirtyDaysAgo },
+        date: { 
+          gte: startOfDay,
+          lte: endOfDay
+        },
       },
       _sum: {
         quantity: true,
@@ -239,14 +251,16 @@ export async function GET(request: NextRequest) {
         unit: item.unit?.name || '',
       }))
 
-    // 3. Grafik tren 7 hari terakhir (barang masuk vs keluar)
-    const sevenDaysAgo = new Date(today)
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    sevenDaysAgo.setHours(0, 0, 0, 0)
-
-    const transactions7Days = await prisma.transaction.findMany({
+    // 3. Grafik tren (barang masuk vs keluar) sesuai periode
+    // Jika periode > 30 hari, kelompokkan per bulan? (Untuk sekarang harian dulu, tapi ambil periode)
+    // Agar chart tidak terlalu penuh, batasi jika rentang terlalu jauh, tapi requirements 'filter' biasanya full range.
+    
+    const transactionsInPeriod = await prisma.transaction.findMany({
       where: {
-        date: { gte: sevenDaysAgo },
+        date: { 
+          gte: startOfDay,
+          lte: endOfDay
+        },
         type: { in: [TransactionType.MASUK, TransactionType.KELUAR] },
       },
       select: {
@@ -254,29 +268,49 @@ export async function GET(request: NextRequest) {
         type: true,
         quantity: true,
       },
-    })
-
-    // Group by date dan type
-    const trendData: Record<string, { masuk: number; keluar: number }> = {}
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(date.getDate() - i)
-      const dateStr = date.toISOString().split('T')[0]
-      trendData[dateStr] = { masuk: 0, keluar: 0 }
-    }
-
-    transactions7Days.forEach((tx) => {
-      const dateStr = tx.date.toISOString().split('T')[0]
-      if (trendData[dateStr]) {
-        if (tx.type === TransactionType.MASUK) {
-          trendData[dateStr].masuk += tx.quantity
-        } else {
-          trendData[dateStr].keluar += tx.quantity
-        }
+      orderBy: {
+        date: 'asc'
       }
     })
 
-    const chartData = Object.entries(trendData).map(([date, values]) => ({
+    // Group by date dan type
+    // Initialize aggregation map
+    const trendData: Record<string, { masuk: number; keluar: number }> = {}
+    
+    // Fill gaps manually? Or just show days with data?
+    // Usually for trends it's better to show all days.
+    // Calculate days diff
+    const dayDiff = Math.ceil((endOfDay.getTime() - startOfDay.getTime()) / (1000 * 3600 * 24))
+    
+    // Batasi loop pengisian tanggal kosong jika range terlalu besar (misal max 30-60 hari)
+    // Jika lebih dari itu, kita hanya tampilkan yg ada datanya atau grouping.
+    // Untuk safety, kita loop startDate -> endDate
+    const loopDate = new Date(startOfDay)
+    if (dayDiff <= 60) { // Hanya isi days kosong jika range <= 60 hari
+       while (loopDate <= endOfDay) {
+          const dateStr = loopDate.toISOString().split('T')[0]
+          trendData[dateStr] = { masuk: 0, keluar: 0 }
+          loopDate.setDate(loopDate.getDate() + 1)
+       }
+    }
+
+    transactionsInPeriod.forEach((tx) => {
+      const dateStr = tx.date.toISOString().split('T')[0]
+      if (!trendData[dateStr]) {
+          trendData[dateStr] = { masuk: 0, keluar: 0 }
+      }
+      
+      if (tx.type === TransactionType.MASUK) {
+        trendData[dateStr].masuk += tx.quantity
+      } else {
+        trendData[dateStr].keluar += tx.quantity
+      }
+    })
+
+    // Sort chart data by date
+    const chartData = Object.entries(trendData)
+      .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+      .map(([date, values]) => ({
       date,
       masuk: values.masuk,
       keluar: values.keluar,

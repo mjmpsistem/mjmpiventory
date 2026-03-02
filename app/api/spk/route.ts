@@ -169,30 +169,6 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 2) Reserve stock untuk semua item FROM_STOCK (selama masih QUEUE)
-      for (const spkItem of createdSpk.spkItems) {
-        if (
-          spkItem.fulfillmentMethod === FulfillmentMethod.FROM_STOCK &&
-          spkItem.itemId &&
-          spkItem.fulfillmentStatus === FulfillmentStatus.PENDING
-        ) {
-          // Reserve stok (tidak mengurangi currentStock, hanya reservedStock)
-          await reserveStock(
-            spkItem.itemId,
-            spkItem.qty,
-            authUser.userId,
-            `Reserve stok untuk SPK ${createdSpk.spkNumber} (QUEUE) - Item: ${spkItem.namaBarang}`,
-            tx,
-          );
-
-          // Update fulfillment status menjadi RESERVED
-          await tx.spkItem.update({
-            where: { id: spkItem.id },
-            data: { fulfillmentStatus: FulfillmentStatus.RESERVED },
-          });
-        }
-      }
-
       // Reload SPK dengan data terbaru
       return tx.spk.findUniqueOrThrow({
         where: { id: createdSpk.id },
@@ -214,6 +190,22 @@ export async function POST(request: NextRequest) {
         },
       });
     });
+
+    // ✅ CREATE NOTIFICATION
+    try {
+      console.log(`[NOTIFICATION_LOG] Creating notification for SPK: ${spkNumber}`);
+      const spkNotification = await prisma.notification.create({
+        data: {
+          title: "SPK Baru",
+          message: `${spkNumber} untuk ${spk.lead.nama_toko}`,
+          type: "INFO",
+          targetUrl: "/dashboard", // Atau link ke detail SPK jika ada
+        },
+      });
+      console.log(`[NOTIFICATION_LOG] Notification created successfully with ID: ${spkNotification.id}`);
+    } catch (notifyError: any) {
+      console.error("[NOTIFICATION_LOG] Failed to create notification for SPK:", notifyError.message || notifyError);
+    }
 
     return NextResponse.json({ spk }, { status: 201 });
   } catch (error: unknown) {

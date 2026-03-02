@@ -10,6 +10,7 @@ import {
   TransactionType,
   TransactionSource,
 } from "@/lib/constants";
+import { updateStock } from "@/lib/stock";
 import { updateSpkStatusIfReady } from "@/lib/spk-status";
 
 /**
@@ -116,22 +117,9 @@ export async function POST(
 
         if (!inventoryItem) continue;
 
-        // Catat transaksi barang keluar
-        await tx.transaction.create({
-          data: {
-            date: new Date(),
-            type: TransactionType.KELUAR,
-            source: TransactionSource.PRODUKSI,
-            itemId: inventoryItem.id,
-            quantity: spkItem.qty,
-            destination: spk.lead.nama_toko || "Customer",
-            spkNumber: spk.spkNumber,
-            memo: `Barang keluar SPK ${spk.spkNumber} - ${spkItem.namaBarang} (PRODUCTION)`,
-            userId: authUser.userId,
-          },
-        });
-
-        // 🔥 INI KUNCI FIX BUG
+        // 🔥 INI KUNCI FIX BUG: Hapus updateStock & Transaction.create di sini.
+        // Pemotongan stok fisik kini dipindah ke gate terakhir: Konfirmasi Kedatangan (api/shipping PATCH).
+        // Di sini kita hanya menandai bahwa barang sudah disetujui gudang.
         await tx.spkItem.update({
           where: { id: spkItem.id },
           data: {

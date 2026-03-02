@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import { useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { AlertTriangle, Filter, Package, FileText, Search } from "lucide-react";
+import { AlertTriangle, Filter, Package, FileText, Search, Loader2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb";
 import { SkeletonTable } from "@/components/ui/SkeletonTable";
 
@@ -171,16 +171,23 @@ export default function LaporanStokPage() {
 
       const rows = items.map((item) => {
         const unitPrice = getUnitPrice(item);
-        const availableStock = item.currentStock - item.reservedStock;
-        const stockValue =
-          Math.round(item.currentStock * unitPrice * 100) / 100;
+
+        // DEFINISI JELAS
+        const physicalStock = item.currentStock;
+        const reservedStock = item.reservedStock;
+        const availableStock = physicalStock - reservedStock;
+
+        // NILAI STOK SELALU PAKAI FISIK
+        const stockValue = Math.round(physicalStock * unitPrice * 100) / 100;
+
+        const isLowStock = availableStock < item.stockMinimum;
 
         return [
           item.code,
           item.name,
           item.itemType.name,
           item.category === "BAHAN_BAKU" ? "Bahan Baku" : "Barang Jadi",
-          item.currentStock,
+          physicalStock,
           item.reservedStock,
           availableStock,
           item.unit.name,
@@ -252,7 +259,7 @@ export default function LaporanStokPage() {
         {/* FILTER */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-5">
           {/* HEADER */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
               <Filter size={16} className="text-blue-600" />
               Filter Data
@@ -263,7 +270,7 @@ export default function LaporanStokPage() {
               onClick={downloadCSV}
               disabled={isDownloading}
               className={`
-        relative inline-flex items-center gap-2
+        relative inline-flex items-center gap-2 w-full sm:w-auto justify-center
         rounded-xl px-4 py-2.5
         text-xs font-semibold text-white
         transition-all duration-200
@@ -277,27 +284,8 @@ export default function LaporanStokPage() {
             >
               {isDownloading ? (
                 <>
-                  <svg
-                    className="h-4 w-4 animate-spin"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                    />
-                  </svg>
-                  Menyiapkan CSV...
+                  <Loader2 size={14} className="animate-spin" />
+                  Menyiapkan...
                 </>
               ) : (
                 <>
@@ -309,10 +297,10 @@ export default function LaporanStokPage() {
           </div>
 
           {/* FILTER BODY */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* KIRI: SEARCH */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-gray-600">
+              <label className="text-xs font-medium text-gray-600 uppercase tracking-wider">
                 Pencarian
               </label>
 
@@ -325,14 +313,14 @@ export default function LaporanStokPage() {
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Nama / kode / jenis barang..."
+                  placeholder="Nama / kode barang..."
                   className="
             w-full
             h-[42px]
             rounded-xl border border-gray-300 bg-white
             pl-9 pr-3 text-sm
             focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30
-            transition
+            transition shadow-sm
           "
                 />
               </div>
@@ -340,18 +328,18 @@ export default function LaporanStokPage() {
 
             {/* TENGAH: KATEGORI + LOW STOCK */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-gray-600">
-                Filter
+              <label className="text-xs font-medium text-gray-600 uppercase tracking-wider">
+                Kategori & Status
               </label>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-3">
                 <select
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
                   className="
-            h-[42px]
+            flex-1 h-[42px]
             rounded-xl border border-gray-300 bg-white px-3 text-sm
-            focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30
+            focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 shadow-sm
           "
                 >
                   <option value="">Semua Kategori</option>
@@ -366,7 +354,7 @@ export default function LaporanStokPage() {
             rounded-xl border border-red-200
             bg-red-50 px-3
             text-sm text-red-700 cursor-pointer
-            transition hover:bg-red-100
+            transition hover:bg-red-100 shadow-sm
           "
                 >
                   <input
@@ -388,15 +376,16 @@ export default function LaporanStokPage() {
                   </div>
 
                   <AlertTriangle size={14} />
-                  <span>Stok Minimum</span>
+                  <span className="hidden sm:inline">Stok Min</span>
+                  <span className="sm:hidden">Min</span>
                 </label>
               </div>
             </div>
 
             {/* KANAN: DATE RANGE */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-gray-600">
-                Rentang Tanggal
+            <div className="flex flex-col gap-2 md:col-span-2 lg:col-span-1">
+              <label className="text-xs font-medium text-gray-600 uppercase tracking-wider">
+                Periode (Filter Tabel)
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -407,7 +396,7 @@ export default function LaporanStokPage() {
                   className="
             h-[42px]
             w-full rounded-xl border border-gray-300 bg-white px-3 text-sm
-            focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30
+            focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 shadow-sm
           "
                 />
 
@@ -418,16 +407,15 @@ export default function LaporanStokPage() {
                   className="
             h-[42px]
             w-full rounded-xl border border-gray-300 bg-white px-3 text-sm
-            focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30
+            focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 shadow-sm
           "
                 />
               </div>
-
-              <p className="text-[11px] text-gray-500">
-                Digunakan untuk filter tabel & export CSV
-              </p>
             </div>
           </div>
+          <p className="text-[11px] text-gray-500">
+            Digunakan untuk filter tabel & export CSV
+          </p>
         </div>
 
         {/* TABLE */}
@@ -468,11 +456,17 @@ export default function LaporanStokPage() {
                 <tbody className="divide-y divide-gray-100">
                   {paginatedItems.map((item) => {
                     const unitPrice = getUnitPrice(item);
+
+                    // DEFINISI JELAS
+                    const physicalStock = item.currentStock;
+                    const reservedStock = item.reservedStock;
+                    const availableStock = physicalStock - reservedStock;
+
+                    // NILAI STOK SELALU PAKAI FISIK
                     const stockValue =
-                      Math.round(item.currentStock * unitPrice * 100) / 100;
-                    const availableStock =
-                      item.currentStock - item.reservedStock;
-                    const isLowStock = item.currentStock < item.stockMinimum;
+                      Math.round(physicalStock * unitPrice * 100) / 100;
+
+                    const isLowStock = availableStock < item.stockMinimum;
 
                     return (
                       <tr
@@ -515,17 +509,17 @@ export default function LaporanStokPage() {
                         </td>
 
                         {/* Stok Fisik */}
-                        <td className="px-5 py-4 text-sm font-semibold text-gray-900 whitespace-nowrap">
-                          {item.currentStock} {item.unit.name}
+                        <td className="px-5 py-4 text-sm font-semibold text-gray-900">
+                          {physicalStock} {item.unit.name}
                         </td>
 
                         {/* Reserved */}
-                        <td className="px-5 py-4 text-sm text-gray-600 whitespace-nowrap">
+                        <td className="px-5 py-4 text-sm text-gray-600">
                           {item.reservedStock} {item.unit.name}
                         </td>
 
                         {/* Tersedia */}
-                        <td className="px-5 py-4 text-sm font-semibold whitespace-nowrap">
+                        <td className="px-5 py-4 text-sm font-semibold">
                           <span
                             className={
                               availableStock <= 0

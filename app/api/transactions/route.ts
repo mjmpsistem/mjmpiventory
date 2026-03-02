@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { updateStock } from "@/lib/stock";
+import { updateStock, fulfillReservedStock } from "@/lib/stock";
 import { UserRole, TransactionType } from "@/lib/constants";
 
 export async function GET(request: NextRequest) {
@@ -149,14 +149,63 @@ export async function POST(request: NextRequest) {
 
     // ✅ UPDATE STOCK
     try {
-      await updateStock(
-        itemId,
-        quantity,
-        type as TransactionType,
-        authUser.userId,
-        memo,
-        transaction.id
-      );
+      // Jika transaksi KELUAR, habiskan reserved stock dulu (kalau ada),
+      // lalu jika qty lebih besar dari reserved, sisanya kurangi currentStock biasa.
+      if (type === TransactionType.KELUAR) {
+        // Ambil kondisi stok terbaru
+        const item = await prisma.item.findUnique({
+          where: { id: itemId },
+          select: {
+            currentStock: true,
+            reservedStock: true,
+          },
+        });
+
+        if (!item) {
+          throw new Error("Item tidak ditemukan saat update stok");
+        }
+
+        let sisaQty = Number(quantity);
+
+        // 1) Jika masih ada reservedStock, kurangi dulu sebatas yang ada
+        if (item.reservedStock > 0) {
+          const qtyDariReserved = Math.min(item.reservedStock, sisaQty);
+
+          if (qtyDariReserved > 0) {
+            await fulfillReservedStock(
+              itemId,
+              qtyDariReserved,
+              authUser.userId,
+              memo,
+              transaction.id
+            );
+
+            sisaQty -= qtyDariReserved;
+          }
+        }
+
+        // 2) Jika masih ada sisa qty, kurangi stok fisik biasa
+        if (sisaQty > 0) {
+          await updateStock(
+            itemId,
+            sisaQty,
+            type as TransactionType,
+            authUser.userId,
+            memo,
+            transaction.id
+          );
+        }
+      } else {
+        // MASUK atau tipe lain tetap gunakan updateStock
+        await updateStock(
+          itemId,
+          quantity,
+          type as TransactionType,
+          authUser.userId,
+          memo,
+          transaction.id
+        );
+      }
     } catch (stockError: any) {
       await prisma.transaction.delete({
         where: { id: transaction.id },
@@ -166,6 +215,22 @@ export async function POST(request: NextRequest) {
         { error: stockError.message || "Gagal update stok" },
         { status: 400 }
       );
+    }
+
+    // ✅ CREATE NOTIFICATION
+    try {
+      console.log("Triggering notification for transaction...");
+      const newNotification = await prisma.notification.create({
+        data: {
+          title: `Barang ${type} Baru`,
+          message: `${quantity} ${transaction.item.unit.name} ${transaction.item.name} (${source || 'Umum'})`,
+          type: type === TransactionType.MASUK ? "SUCCESS" : "INFO",
+          targetUrl: `/laporan/barang-${type.toLowerCase()}`,
+        },
+      });
+      console.log("Notification created successfully:", newNotification.id);
+    } catch (notifyError: any) {
+      console.error("Failed to create notification for transaction:", notifyError.message);
     }
 
     return NextResponse.json({ transaction }, { status: 201 });

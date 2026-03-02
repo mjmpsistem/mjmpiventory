@@ -23,15 +23,23 @@ Sistem web-based untuk mengelola inventory gudang pabrik plastik dengan fitur le
 - Memo wajib untuk semua transaksi
 
 ### 4. Permintaan Bahan Baku Produksi
-- Input permintaan bahan baku dari produksi
-- Validasi stok sebelum approval
-- Auto-generate transaksi barang keluar saat disetujui
-- Status tracking (Pending, Approved, Completed, Rejected)
+- **Integrasi SPK**:
+  - Melihat detail SPK (Nomor, Item, Spesifikasi Tambahan)
+  - Tracking status permintaan (Pending, Approved, Completed, Rejected)
+- **Approval System**:
+  - Validasi stok otomatis ("Cukup" / "Tidak Cukup")
+  - **Auto-deduct Stock**: Saat disetujui, stok fisik otomatis berkurang dan tercatat di Barang Keluar
+  - **PDF Export**: Cetak Bukti Permintaan Produksi untuk yang sudah Approved
 
 ### 5. Laporan
-- **Laporan Stok**: Stok bahan baku, barang jadi, stok di bawah minimum, nilai stok
-- **Laporan Barang Masuk**: Filter tanggal dan barang
-- **Laporan Barang Keluar**: Filter tanggal dan SPK
+- **Laporan Stok Real-time**:
+  - **Stok Fisik**: Jumlah barang di gudang
+  - **Reserved**: Jumlah barang yang sudah di-tag untuk produksi (SPK) tapi belum diambil
+  - **Stok Tersedia**: Stok Fisik - Reserved
+  - **Nilai Stok**: Perhitungan aset berdasarkan Harga Rata-rata (Weighted Average) atau Harga Manual
+- **Fitur Export**: Download laporan stok ke format CSV dengan filter tanggal dan kategori
+- **Monitoring**: Highlight stok di bawah minimum
+- **Laporan Transaksi**: Filter barang masuk/keluar berdasarkan tanggal dan SPK
 
 ## 🛠️ Teknologi
 
@@ -151,13 +159,28 @@ inventory/
 ### Produksi
 - ❌ Tidak memiliki akses ke sistem (input dilakukan oleh Admin Gudang)
 
-## 📝 Aturan Bisnis
+## 📝 Core Logic: Sistem Reservasi Stok
 
-1. **Memo Wajib**: Semua transaksi harus memiliki memo
-2. **Stok Tidak Boleh Minus**: Validasi dilakukan saat barang keluar
-3. **Update Stok Otomatis**: Stok update otomatis dari transaksi
-4. **Audit Log**: Semua perubahan stok tersimpan di StockHistory
-5. **Validasi Stok**: Permintaan produksi divalidasi stok sebelum approval
+Sistem ini menggunakan mekanisme **Stock Reservation** untuk mencegah overselling/double allocation:
+
+1. **Reserved Logic**:
+   - Saat SPK Produksi dibuat, stok bahan baku masuk status **Reserved**.
+   - Stok Fisik **BELUM** berkurang.
+   - Stok Tersedia = Stok Fisik - Reserved.
+
+2. **Fulfillment Logic**:
+   - Saat permintaan disetujui (Approved), stok **Reserved** dilepas.
+   - Stok Fisik berkurang sesuai jumlah permintaan.
+   - Transaksi Barang Keluar tercatat otomatis.
+
+3. **Release Logic**:
+   - Jika SPK dibatalkan, stok **Reserved** dikembalikan ke Stok Tersedia.
+
+## ⚖️ Aturan Bisnis Lainnya
+
+1. **Memo Wajib**: Semua transaksi manual harus memiliki memo.
+2. **Stok Minus**: Stok fisik tidak boleh kurang dari 0.
+3. **Audit Trail**: Setiap perubahan stok (fisik maupun reserved) tercatat di tabel `StockHistory`.
 
 ## 🚀 Production Deployment
 
@@ -188,4 +211,4 @@ Untuk pertanyaan atau issue, silakan buat issue di repository ini.
 
 ## 📄 License
 
-Private project - All rights reserved
+Private project Associe Team - All rights reserved

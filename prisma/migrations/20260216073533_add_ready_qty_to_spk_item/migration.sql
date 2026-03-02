@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "spk_item" ADD COLUMN     "readyQty" DOUBLE PRECISION NOT NULL DEFAULT 0;

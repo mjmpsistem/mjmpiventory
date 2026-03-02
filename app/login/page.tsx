@@ -66,51 +66,52 @@ export default function LoginPage() {
         {/* CARD */}
         <div
           className={`
-            relative w-full max-w-5xl h-[520px]
+            relative w-full max-w-5xl 
             bg-white/70 backdrop-blur-xl
             rounded-2xl shadow-xl
             transition-all duration-700 ease-in-out
+            flex flex-col md:flex-row overflow-hidden
             ${
               isExiting
                 ? "opacity-0 scale-95 pointer-events-none"
                 : isEntering
                   ? "opacity-0 scale-95"
-                  : "opacity-100 scale-100 overflow-hidden"
+                  : "opacity-100 scale-100"
             }
           `}
         >
-          {/* LEFT PANEL */}
+          {/* LEFT PANEL (BRANDING) */}
           <div
             className={`
-    absolute inset-y-0 left-0 w-1/2
-    bg-gradient-to-br from-blue-800 via-indigo-900 to-slate-900
-    text-white px-14 flex flex-col justify-center
-    transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)]
-    ${
-      isExiting || isEntering
-        ? "-translate-x-[120vw] opacity-0"
-        : "translate-x-0 opacity-100"
-    }
-  `}
+              w-full md:w-1/2
+              bg-gradient-to-br from-blue-800 via-indigo-900 to-slate-900
+              text-white px-8 md:px-14 py-12 flex flex-col justify-center
+              transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)]
+              ${
+                isExiting || isEntering
+                  ? "-translate-x-full opacity-0"
+                  : "translate-x-0 opacity-100"
+              }
+            `}
           >
             {/* Header */}
-            <div className="flex items-center gap-3 mb-10">
+            <div className="flex items-center gap-3 mb-8 md:mb-10">
               <Image
                 src="/assets/logo.png"
                 alt="Inventory System Logo"
-                width={44}
-                height={44}
+                width={40}
+                height={40}
                 className="object-contain drop-shadow-md"
                 priority
               />
 
-              <span className="text-2xl font-semibold tracking-wide">
+              <span className="text-xl md:text-2xl font-semibold tracking-wide">
                 Inventory <span className="text-blue-300">System</span>
               </span>
             </div>
 
             {/* Main Title */}
-            <h1 className="text-[42px] font-bold leading-tight mb-6">
+            <h1 className="text-3xl md:text-[42px] font-bold leading-tight mb-4 md:mb-6">
               Warehouse &
               <br />
               <span className="text-blue-300">Production Inventory</span>
@@ -119,7 +120,7 @@ export default function LoginPage() {
             </h1>
 
             {/* Accent line */}
-            <div className="w-20 h-1 bg-blue-400 rounded-full mb-5" />
+            <div className="w-16 md:w-20 h-1bg-blue-400 rounded-full mb-5" />
 
             {/* Description */}
             <p className="text-blue-100 text-sm leading-relaxed max-w-lg">
@@ -130,23 +131,23 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* RIGHT PANEL */}
+          {/* RIGHT PANEL (FORM) */}
           <div
             className={`
-              absolute inset-y-0 right-0 w-1/2
-              flex items-center justify-center p-8 sm:p-12
+              w-full md:w-1/2
+              flex items-center justify-center p-8 md:p-12
               transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)]
               ${
                 isExiting
-                  ? "translate-x-[120vw] opacity-0"
+                  ? "translate-x-full opacity-0"
                   : isEntering
-                    ? "translate-x-[120vw] opacity-0"
+                    ? "translate-x-full opacity-0"
                     : "translate-x-0 opacity-100"
               }
             `}
           >
             <div className="w-full max-w-md">
-              <h2 className="text-3xl font-bold text-gray-900 mb-1">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
                 Login Sistem
               </h2>
               <p className="text-sm text-gray-500 mb-6">
@@ -159,7 +160,7 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
                 {/* Username */}
                 <div>
                   <label className="text-sm font-medium text-gray-700">
@@ -228,7 +229,7 @@ export default function LoginPage() {
 
                 <button
                   disabled={loading}
-                  className="w-full h-11 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold disabled:opacity-50"
+                  className="w-full h-11 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold disabled:opacity-50 active:scale-[0.98] transition-transform"
                 >
                   {loading ? "Memverifikasi..." : "Masuk ke Sistem"}
                 </button>

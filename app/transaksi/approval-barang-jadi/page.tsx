@@ -248,59 +248,52 @@ export default function ApprovalBarangJadiPage() {
       <div className="space-y-6">
         <Breadcrumb />
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4 space-y-4">
-          {/* TITLE */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-4 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+                {/* SORT */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="h-10 pl-3 pr-8 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition-all appearance-none"
+                >
+                  <option value="date">Urutkan: Terbaru</option>
+                  <option value="status">Urutkan: Status</option>
+                </select>
 
-          {/* CONTROL BAR */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {/* LEFT CONTROLS */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* SORT */}
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="h-9 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="date">Urutkan: Terbaru</option>
-                <option value="status">Urutkan: Status</option>
-              </select>
-
-              {/* FILTER STATUS */}
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="h-9 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="ALL">Semua Status</option>
-                <option value="WAITING">Waiting Approval</option>
-                <option value="APPROVED">Approved</option>
-              </select>
+                {/* FILTER STATUS */}
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as any)}
+                  className="h-10 pl-3 pr-8 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition-all appearance-none"
+                >
+                  <option value="ALL">Semua Status</option>
+                  <option value="WAITING">Waiting Approval</option>
+                  <option value="APPROVED">Approved</option>
+                </select>
+              </div>
 
               {/* LIMIT */}
-              <select
-                value={limit}
-                onChange={(e) => {
-                  setLimit(Number(e.target.value)); // ✅ BENAR
-                  setPage(1);
-                }}
-                className="h-9 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value={5}>Tampilkan 5</option>
-                <option value={10}>Tampilkan 10</option>
-                <option value={20}>Tampilkan 20</option>
-                <option value={50}>Tampilkan 50</option>
-              </select>
+              <div className="w-full sm:w-auto">
+                <select
+                  value={limit}
+                  onChange={(e) => {
+                    setLimit(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="w-full sm:w-auto h-10 pl-3 pr-8 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm appearance-none transition-all"
+                >
+                  <option value={5}>Tampilkan 5</option>
+                  <option value={10}>Tampilkan 10</option>
+                  <option value={20}>Tampilkan 20</option>
+                  <option value={50}>Tampilkan 50</option>
+                </select>
+              </div>
             </div>
 
-            {/* RIGHT INFO */}
-            <div className="text-sm text-gray-500">
-              Menampilkan{" "}
-              <span className="font-medium text-gray-700">
-                {visibleSpks.length}
-              </span>{" "}
-              dari{" "}
-              <span className="font-medium text-gray-700">{spks.length}</span>{" "}
-              SPK
+            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-gray-100 dark:border-gray-700">
+              Menampilkan <span className="text-blue-600 dark:text-blue-400">{visibleSpks.length}</span> dari <span className="text-gray-900 dark:text-white">{spks.length}</span> SPK
             </div>
           </div>
         </div>

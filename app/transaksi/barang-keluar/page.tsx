@@ -290,10 +290,10 @@ export default function BarangKeluarPage() {
         <Breadcrumb />
         {/* Header */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex flex-wrap items-end gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-6 gap-4 items-end">
             {/* Category */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">Kategori</label>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</label>
               <div className="relative">
                 <Filter
                   size={16}
@@ -302,7 +302,7 @@ export default function BarangKeluarPage() {
                 <select
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
-                  className="h-10 pl-9 pr-4 w-48 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="h-10 pl-9 pr-4 w-full border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
                 >
                   <option value="ALL">Semua Kategori</option>
                   <option value={ItemCategory.BAHAN_BAKU}>Bahan Baku</option>
@@ -313,11 +313,11 @@ export default function BarangKeluarPage() {
 
             {/* Source */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">Sumber</label>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Sumber</label>
               <select
                 value={filterSource}
                 onChange={(e) => setFilterSource(e.target.value)}
-                className="h-10 px-4 w-48 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="h-10 px-4 w-full border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
               >
                 <option value="ALL">Semua Sumber</option>
                 <option value={TransactionSource.ORDER_CUSTOMER}>
@@ -331,8 +331,8 @@ export default function BarangKeluarPage() {
             </div>
 
             {/* Search */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">Pencarian</label>
+            <div className="flex flex-col gap-1 sm:col-span-2 lg:col-span-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Pencarian</label>
               <div className="relative">
                 <Search
                   size={16}
@@ -343,55 +343,53 @@ export default function BarangKeluarPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Nama / kode / jenis / SPK"
-                  className="h-10 pl-9 pr-4 w-64 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="h-10 pl-9 pr-4 w-full border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
                 />
               </div>
             </div>
 
             {/* Date Range */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">Tanggal</label>
+            <div className="flex flex-col gap-1 sm:col-span-2 lg:col-span-2">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</label>
               <div className="flex items-center gap-2">
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="h-10 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  className="h-10 flex-1 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 transition-all outline-none"
                 />
                 <span className="text-gray-400 text-sm">–</span>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="h-10 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  className="h-10 flex-1 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 transition-all outline-none"
                 />
               </div>
             </div>
 
-            {/* Reset */}
-            <button
-              onClick={() => {
-                setStartDate("");
-                setEndDate("");
-                setFilterCategory("ALL");
-                setFilterSource("ALL");
-              }}
-              className="h-10 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
-            >
-              Reset
-            </button>
+            {/* Buttons */}
+            <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-1">
+              <button
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                  setFilterCategory("ALL");
+                  setFilterSource("ALL");
+                }}
+                className="h-10 flex-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
+              >
+                Reset
+              </button>
 
-            {/* Spacer */}
-            <div className="flex-1" />
-
-            {/* Action */}
-            <button
-              onClick={() => setShowModal(true)}
-              className="h-10 inline-flex items-center gap-2 px-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-md transition-all text-sm font-semibold"
-            >
-              <Plus size={18} />
-              Tambah Barang Keluar
-            </button>
+              <button
+                onClick={() => setShowModal(true)}
+                className="h-10 flex-[2] inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-md transition-all text-sm font-semibold whitespace-nowrap"
+              >
+                <Plus size={18} />
+                <span>Tambah</span>
+              </button>
+            </div>
           </div>
         </div>
 

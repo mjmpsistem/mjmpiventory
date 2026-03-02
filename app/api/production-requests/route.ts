@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { updateStock, getAvailableStock } from "@/lib/stock";
+import { updateStock, getAvailableStock, reserveStock } from "@/lib/stock";
 import {
   UserRole,
   ProductionRequestStatus,
@@ -44,14 +44,20 @@ export async function GET(request: NextRequest) {
         // 🔥 INI YANG KURANG
         spk: {
           include: {
+            lead: true,
             spkItems: {
               include: {
                 salesOrder: {
                   select: {
                     id: true,
-                    spesifikasi_barang: true,
+                    spesifikasi_tambahan: true,
                   },
                 },
+                shipping_item: {
+                  include: {
+                    shipping: true
+                  }
+                }
               },
             },
           },
@@ -121,8 +127,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Gunakan availableStock (currentStock - reservedStock)
-      const availableStock = dbItem.currentStock - dbItem.reservedStock;
+      // Di model baru: currentStock SUDAH stok fisik yang bersih (belum di-reserve)
+      const availableStock = dbItem.currentStock;
       if (availableStock < item.quantity) {
         return NextResponse.json(
           {
@@ -201,6 +207,22 @@ export async function POST(request: NextRequest) {
 
       return newRequest;
     });
+
+    // ✅ CREATE NOTIFICATION
+    try {
+      console.log(`[NOTIFICATION_LOG] Creating notification for Production Request: SPK #${spkNumber}`);
+      const prNotification = await prisma.notification.create({
+        data: {
+          title: "Permintaan Produksi Baru",
+          message: `SPK #${spkNumber} - ${productName}`,
+          type: "INFO",
+          targetUrl: "/permintaan-produksi",
+        },
+      });
+      console.log(`[NOTIFICATION_LOG] Notification created successfully with ID: ${prNotification.id}`);
+    } catch (notifyError: any) {
+      console.error("[NOTIFICATION_LOG] Failed to create notification for PR:", notifyError.message || notifyError);
+    }
 
     return NextResponse.json({ productionRequest }, { status: 201 });
   } catch (error: any) {

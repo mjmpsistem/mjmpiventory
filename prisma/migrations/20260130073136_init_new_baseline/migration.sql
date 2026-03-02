@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "sales_order" ALTER COLUMN "harga_satuan" DROP NOT NULL,
+ALTER COLUMN "harga_satuan" DROP DEFAULT,
+ALTER COLUMN "harga_total" DROP NOT NULL,
+ALTER COLUMN "harga_total" DROP DEFAULT,
+ALTER COLUMN "header_id" DROP NOT NULL,
+ALTER COLUMN "header_id" DROP DEFAULT;

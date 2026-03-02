@@ -11,7 +11,7 @@ export interface JWTPayload {
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 
 export function generateToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' })
 }
 
 export function verifyToken(token: string): JWTPayload | null {

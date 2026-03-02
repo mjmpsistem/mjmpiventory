@@ -17,15 +17,19 @@ import {
   ClipboardList,
   FileText,
   TrendingDown,
-  BarChart3,
   AlertCircle,
   CheckCircle,
+  Recycle,
+  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { SkeletonCard } from "@/components/ui/SkeletonCard";
 import { SkeletonTable } from "@/components/ui/SkeletonTable";
 import { motion } from "framer-motion";
+import { WasteSummaryCard } from "@/components/dashboard/WasteSummaryCard";
+import { ProductionEfficiencyChart } from "@/components/dashboard/ProductionEfficiencyChart";
+import { SlowMovingItemsCard } from "@/components/dashboard/SlowMovingItemsCard";
 
 interface StockItem {
   id: string;
@@ -39,6 +43,7 @@ interface StockItem {
 interface RecentTransaction {
   id: string;
   type: string;
+  source?: string; // Add source
   date: string;
   quantity: number;
   memo: string;
@@ -133,10 +138,17 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  // const [date, setDate] = useState(new Date().toISOString().split("T")[0]); // Removed unused state
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refetching, setRefetching] = useState(false);
+  
+  // State for filters
+  type DatePreset = "custom" | "week" | "month" | "year";
+  const [datePreset, setDatePreset] = useState<DatePreset>("week");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: (custom: number) => ({
@@ -145,7 +157,7 @@ export default function DashboardPage() {
       transition: {
         delay: custom * 0.1,
         duration: 0.5,
-        ease: "easeOut" as const, // << type-safe untuk TS
+        ease: "easeOut" as const, 
       },
     }),
   };
@@ -169,36 +181,6 @@ export default function DashboardPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [date]);
-
-  const fetchDashboardData = async () => {
-    try {
-      !data ? setLoading(true) : setRefetching(true);
-
-      const params = new URLSearchParams();
-      if (dateFrom) params.append("from", dateFrom);
-      if (dateTo) params.append("to", dateTo);
-
-      const res = await fetch(`/api/dashboard?${params.toString()}`);
-      const result = await res.json();
-
-      if (res.ok) setData(result);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-      setRefetching(false);
-    }
-  };
-
-  type DatePreset = "custom" | "week" | "month" | "year";
-
-  const [datePreset, setDatePreset] = useState<DatePreset>("week");
-  const [dateFrom, setDateFrom] = useState<string>("");
-  const [dateTo, setDateTo] = useState<string>("");
 
   const getDateRangeFromPreset = (preset: DatePreset) => {
     const now = new Date();
@@ -232,6 +214,34 @@ export default function DashboardPage() {
     }
   }, [datePreset]);
 
+  // Fetch data when dateFrom or dateTo changes
+  useEffect(() => {
+    if (dateFrom && dateTo) {
+        fetchDashboardData();
+    }
+  }, [dateFrom, dateTo]);
+
+  const fetchDashboardData = async () => {
+    try {
+      !data ? setLoading(true) : setRefetching(true);
+
+      const params = new URLSearchParams();
+      if (dateFrom) params.append("from", dateFrom);
+      if (dateTo) params.append("to", dateTo);
+
+      const res = await fetch(`/api/dashboard?${params.toString()}`);
+      const result = await res.json();
+
+      if (res.ok) setData(result);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+      setRefetching(false);
+    }
+  };
+
+
   if (loading && !data) {
     return (
       <Layout>
@@ -255,20 +265,20 @@ export default function DashboardPage() {
           {/* Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Stok Minimum */}
-            <div className="bg-white dark:bg-gray-900 rounded-2xl p-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
               <Skeleton className="h-5 w-40 mb-4" />
               <SkeletonTable rows={5} cols={3} />
             </div>
 
             {/* Nilai Stok */}
-            <div className="bg-white dark:bg-gray-900 rounded-2xl p-10 text-center space-y-4">
+            <div className="bg-white rounded-2xl p-10 text-center space-y-4 shadow-sm">
               <Skeleton className="h-20 w-20 mx-auto rounded-2xl" />
               <Skeleton className="h-8 w-40 mx-auto" />
               <Skeleton className="h-4 w-56 mx-auto" />
             </div>
 
             {/* Aktivitas */}
-            <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 space-y-4">
+            <div className="bg-white rounded-2xl p-6 space-y-4 shadow-sm">
               <Skeleton className="h-5 w-40" />
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-10 w-full" />
@@ -341,13 +351,13 @@ export default function DashboardPage() {
       date: tx.date,
       title:
         tx.type === "MASUK"
-          ? `Barang Masuk: ${tx.item.name}`
+          ? (tx.source === "DAUR_ULANG" ? `Hasil Daur Ulang: ${tx.item.name}` : `Barang Masuk: ${tx.item.name}`)
           : `Barang Keluar: ${tx.item.name}`,
       description: `${tx.quantity} ${tx.item.unit.name} - ${tx.memo}`,
       user: tx.user.name,
-      icon: tx.type === "MASUK" ? ArrowDownCircle : ArrowUpCircle,
-      color: tx.type === "MASUK" ? "text-green-600" : "text-orange-600",
-      bgColor: tx.type === "MASUK" ? "bg-green-100" : "bg-orange-100",
+      icon: tx.type === "MASUK" ? (tx.source === "DAUR_ULANG" ? Recycle : ArrowDownCircle) : ArrowUpCircle,
+      color: tx.type === "MASUK" ? (tx.source === "DAUR_ULANG" ? "text-green-600" : "text-green-600") : "text-orange-600",
+      bgColor: tx.type === "MASUK" ? (tx.source === "DAUR_ULANG" ? "bg-green-100" : "bg-green-100") : "bg-orange-100",
       href: `/transaksi/${
         tx.type === "MASUK" ? "barang-masuk" : "barang-keluar"
       }`,
@@ -386,78 +396,104 @@ export default function DashboardPage() {
         <Breadcrumb />
 
         {/* Header */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* === Preset Filter (Segmented Modern) === */}
-          <div
-            className="
-      relative flex items-center
-      p-1
-      rounded-2xl
-      bg-gradient-to-b from-gray-50 to-white
-      border border-gray-200
-      shadow-sm
-    "
-          >
-            {[
-              { label: "Minggu", value: "week" },
-              { label: "Bulan", value: "month" },
-              { label: "Tahun", value: "year" },
-            ].map((p) => {
-              const active = datePreset === p.value;
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* === Preset Filter (Segmented Modern) === */}
+            <div
+              className="
+        relative flex items-center
+        p-1
+        rounded-2xl
+        bg-gradient-to-b from-gray-50 to-white
+        border border-gray-200
+        shadow-sm
+      "
+            >
+              {[
+                { label: "Minggu", value: "week" },
+                { label: "Bulan", value: "month" },
+                { label: "Tahun", value: "year" },
+              ].map((p) => {
+                const active = datePreset === p.value;
 
-              return (
-                <button
-                  key={p.value}
-                  onClick={() => setDatePreset(p.value as DatePreset)}
-                  className={`
-            relative z-10
-            px-4 py-1.5
-            text-sm font-semibold
-            rounded-xl
-            transition-all duration-200
-            ${
-              active
-                ? "bg-blue-600 text-white shadow-sm"
-                : "text-gray-600 hover:text-gray-900"
-            }
+                return (
+                  <button
+                    key={p.value}
+                    onClick={() => setDatePreset(p.value as DatePreset)}
+                    className={`
+              relative z-10
+              px-4 py-1.5
+              text-sm font-semibold
+              rounded-xl
+              transition-all duration-200
+              ${
+                active
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              }
+            `}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* === Refresh Button === */}
+            <button
+              onClick={fetchDashboardData}
+              title="Refresh"
+              className="
+          group
+          p-3
+          rounded-2xl
+          bg-gradient-to-br from-white to-gray-50
+          border border-gray-200
+          shadow-sm
+          hover:shadow-md
+          hover:border-blue-300
+          active:scale-95
+          transition-all
+        "
+            >
+              <RefreshCw
+                size={18}
+                className={`
+            text-blue-600
+            transition-transform duration-300
+            group-hover:rotate-180
+            ${refetching ? "animate-spin" : ""}
           `}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
+              />
+            </button>
           </div>
 
           {/* === Custom Date Range === */}
           <div
             className="
-      flex items-center gap-2
-      px-4 py-2
-      rounded-2xl
-      bg-white
-      border border-gray-200
-      shadow-sm
-      hover:border-blue-300
-      transition
-    "
-          >
-            <Calendar size={16} className="text-blue-500" />
-
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => {
-                setDatePreset("custom");
-                setDateFrom(e.target.value);
-              }}
-              className="
-        text-sm
-        text-gray-700
-        bg-transparent
-        focus:outline-none
-        focus:ring-0
+        flex items-center gap-2
+        px-4 py-2
+        rounded-2xl
+        bg-white
+        border border-gray-200
+        shadow-sm
+        hover:border-blue-300
+        transition
+        flex-1 md:flex-initial justify-between md:justify-start
       "
-            />
+          >
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-blue-500" />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDatePreset("custom");
+                  setDateFrom(e.target.value);
+                }}
+                className="text-sm text-gray-700 bg-transparent focus:outline-none"
+              />
+            </div>
 
             <span className="text-gray-300 text-sm">—</span>
 
@@ -468,43 +504,9 @@ export default function DashboardPage() {
                 setDatePreset("custom");
                 setDateTo(e.target.value);
               }}
-              className="
-        text-sm
-        text-gray-700
-        bg-transparent
-        focus:outline-none
-        focus:ring-0
-      "
+              className="text-sm text-gray-700 bg-transparent focus:outline-none"
             />
           </div>
-
-          {/* === Refresh Button === */}
-          <button
-            onClick={fetchDashboardData}
-            title="Refresh"
-            className="
-      group
-      p-3
-      rounded-2xl
-      bg-gradient-to-br from-white to-gray-50
-      border border-gray-200
-      shadow-sm
-      hover:shadow-md
-      hover:border-blue-300
-      active:scale-95
-      transition-all
-    "
-          >
-            <RefreshCw
-              size={18}
-              className={`
-        text-blue-600
-        transition-transform duration-300
-        group-hover:rotate-180
-        ${refetching ? "animate-spin" : ""}
-      `}
-            />
-          </button>
         </div>
 
         {/* Stat Cards */}
@@ -574,8 +576,8 @@ export default function DashboardPage() {
                   <thead className="text-gray-500">
                     <tr>
                       <th className="py-2 text-left">Barang</th>
-                      <th className="py-2 text-right">Stok</th>
-                      <th className="py-2 text-right">Minimum</th>
+                      <th className="py-2 text-right text-red-600">Stock</th>
+                      <th className="py-2 text-right text-gray-400">Min</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -691,6 +693,39 @@ export default function DashboardPage() {
                     );
                   })}
             </div>
+          </motion.div>
+
+          {/* Waste Summary Card (New) */}
+          <motion.div
+            custom={5}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            className="h-full"
+          >
+            <WasteSummaryCard dateFrom={dateFrom} dateTo={dateTo} />
+          </motion.div>
+
+          {/* Efisiensi Produksi */}
+          <motion.div
+            custom={6}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            className="h-full"
+          >
+            <ProductionEfficiencyChart dateFrom={dateFrom} dateTo={dateTo} />
+          </motion.div>
+
+          {/* Slow Moving Items */}
+          <motion.div
+            custom={7}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            className="h-full"
+          >
+            <SlowMovingItemsCard />
           </motion.div>
         </div>
 
@@ -829,7 +864,7 @@ export default function DashboardPage() {
               <BarChart3 className="text-blue-600" size={20} />
             </div>
             <h3 className="font-semibold text-gray-900">
-              Tren Barang Masuk vs Keluar (7 Hari Terakhir)
+              Tren Barang Masuk vs Keluar
             </h3>
           </div>
           <div className="p-6">

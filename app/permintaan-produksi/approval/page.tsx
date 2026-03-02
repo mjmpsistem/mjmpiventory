@@ -49,7 +49,7 @@ interface ProductionRequest {
       qty: number;
       satuan: string;
       salesOrder: {
-        spesifikasi_barang?: string;
+        spesifikasi_tambahan?: string;
       };
     }[];
   };
@@ -81,26 +81,36 @@ export default function ApprovalPage() {
     }
   };
 
-  const handleApprove = async (id: string) => {
-    if (
-      !confirm(
-        "Yakin ingin menyetujui permintaan ini? Stok bahan baku akan otomatis dikurangi dan tercatat di transaksi barang keluar.",
-      )
-    ) {
-      return;
-    }
+  const [selectedApproveId, setSelectedApproveId] = useState<string | null>(
+    null,
+  );
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
 
-    setApproving(id);
+  const openApproveModal = (id: string) => {
+    setSelectedApproveId(id);
+    setIsApproveModalOpen(true);
+  };
+
+  const handleApprove = async () => {
+    if (!selectedApproveId) return;
+
+    setApproving(selectedApproveId);
+
     try {
-      const res = await fetch(`/api/production-requests/${id}/approve`, {
-        method: "POST",
-      });
+      const res = await fetch(
+        `/api/production-requests/${selectedApproveId}/approve`,
+        {
+          method: "POST",
+        },
+      );
 
       if (res.ok) {
-        fetchRequests();
         toast.success(
           "Permintaan disetujui! Stok bahan baku telah dikurangi dan tercatat di transaksi barang keluar.",
         );
+        fetchRequests();
+        setIsApproveModalOpen(false);
+        setSelectedApproveId(null);
       } else {
         const data = await res.json();
         toast.error(data.error || "Terjadi kesalahan");
@@ -112,24 +122,41 @@ export default function ApprovalPage() {
     }
   };
 
-  const handleReject = async (id: string) => {
-    if (!confirm("Yakin ingin menolak permintaan ini?")) {
-      return;
-    }
+  const [selectedRejectId, setSelectedRejectId] = useState<string | null>(null);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  const openRejectModal = (id: string) => {
+    setSelectedRejectId(id);
+    setIsRejectModalOpen(true);
+  };
+
+  const handleReject = async () => {
+    if (!selectedRejectId) return;
+
+    setIsRejecting(true);
 
     try {
-      const res = await fetch(`/api/production-requests/${id}/reject`, {
-        method: "POST",
-      });
+      const res = await fetch(
+        `/api/production-requests/${selectedRejectId}/reject`,
+        {
+          method: "POST",
+        },
+      );
 
       if (res.ok) {
+        toast.success("Permintaan berhasil ditolak.");
         fetchRequests();
+        setIsRejectModalOpen(false);
+        setSelectedRejectId(null);
       } else {
         const data = await res.json();
         toast.error(data.error || "Terjadi kesalahan");
       }
     } catch (error) {
       toast.error("Terjadi kesalahan");
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -226,32 +253,37 @@ export default function ApprovalPage() {
                       </div>
                       <div className="text-sm text-gray-600 mb-1">
                         <span className="font-medium">Produk:</span>
-                        {request.spk && request.spk.spkItems && request.spk.spkItems.length > 0 ? (
-                            <ul className="mt-2 space-y-2 pl-2 border-l-2 border-blue-100">
-                              {request.spk.spkItems.map((item, idx) => (
-                                <li key={idx}>
-                                  <div className="flex justify-between gap-4">
-                                      <span className="font-semibold text-gray-800">{item.namaBarang}</span>
-                                      <span className="text-gray-500 whitespace-nowrap">{item.qty} {item.satuan}</span>
+                        {request.spk &&
+                        request.spk.spkItems &&
+                        request.spk.spkItems.length > 0 ? (
+                          <ul className="mt-2 space-y-2 pl-2 border-l-2 border-blue-100">
+                            {request.spk.spkItems.map((item, idx) => (
+                              <li key={idx}>
+                                <div className="flex justify-between gap-4">
+                                  <span className="font-semibold text-gray-800">
+                                    {item.namaBarang}
+                                  </span>
+                                  <span className="text-gray-500 whitespace-nowrap">
+                                    {item.qty} {item.satuan}
+                                  </span>
+                                </div>
+                                {item.salesOrder?.spesifikasi_tambahan && (
+                                  <div className="text-xs text-gray-500 mt-0.5 italic">
+                                    Spec: {item.salesOrder.spesifikasi_tambahan}
                                   </div>
-                                   {item.salesOrder?.spesifikasi_barang && (
-                                      <div className="text-xs text-gray-500 mt-0.5 italic">
-                                        Spec: {item.salesOrder.spesifikasi_barang}
-                                      </div>
-                                    )}
-                                </li>
-                              ))}
-                            </ul>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                         ) : (
-                             <ul className="list-disc list-inside mt-1 ml-2">
-                              {request.productName
-                                .split(", ")
-                                .map((product, idx) => (
-                                  <li key={idx}>{product}</li>
-                                ))}
-                            </ul>
+                          <ul className="list-disc list-inside mt-1 ml-2">
+                            {request.productName
+                              .split(", ")
+                              .map((product, idx) => (
+                                <li key={idx}>{product}</li>
+                              ))}
+                          </ul>
                         )}
-
                       </div>
                       <p className="text-sm text-gray-600 mb-1">
                         <span className="font-medium">Tanggal:</span>{" "}
@@ -350,7 +382,7 @@ export default function ApprovalPage() {
                   {request.status === "PENDING" && (
                     <div className="flex gap-3 pt-4 border-t border-gray-200">
                       <button
-                        onClick={() => handleApprove(request.id)}
+                        onClick={() => openApproveModal(request.id)}
                         disabled={approving === request.id}
                         className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -367,7 +399,7 @@ export default function ApprovalPage() {
                         )}
                       </button>
                       <button
-                        onClick={() => handleReject(request.id)}
+                        onClick={() => openRejectModal(request.id)}
                         disabled={approving === request.id}
                         className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -395,6 +427,76 @@ export default function ApprovalPage() {
           </div>
         )}
       </div>
+
+      {isRejectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Overlay ringan */}
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => !isRejecting && setIsRejectModalOpen(false)}
+          />
+
+          {/* Mini Confirm Box */}
+          <div className="relative bg-white rounded-xl shadow-lg w-full max-w-sm p-5 z-10">
+            <p className="text-sm text-gray-700 mb-4">
+              Tolak permintaan produksi ini?
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setIsRejectModalOpen(false)}
+                disabled={isRejecting}
+                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100 transition disabled:opacity-50"
+              >
+                Batal
+              </button>
+
+              <button
+                onClick={handleReject}
+                disabled={isRejecting}
+                className="px-3 py-1.5 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {isRejecting ? "..." : "Tolak"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isApproveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Overlay ringan */}
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => approving === null && setIsApproveModalOpen(false)}
+          />
+
+          {/* Mini Confirm Box */}
+          <div className="relative bg-white rounded-xl shadow-lg w-full max-w-sm p-5 z-10">
+            <p className="text-sm text-gray-700 mb-4">
+              Setujui permintaan produksi ini?
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setIsApproveModalOpen(false)}
+                disabled={approving !== null}
+                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100 transition disabled:opacity-50"
+              >
+                Batal
+              </button>
+
+              <button
+                onClick={handleApprove}
+                disabled={approving !== null}
+                className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-700 transition disabled:opacity-50"
+              >
+                {approving ? "..." : "Setujui"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

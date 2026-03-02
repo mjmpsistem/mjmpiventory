@@ -1,9 +1,21 @@
-import { prisma } from './prisma'
-import { TransactionType } from './constants'
-import { Prisma } from '@prisma/client'
+import { prisma } from "./prisma";
+import { TransactionType } from "./constants";
+import { Prisma } from "@prisma/client";
 
-type PrismaTransaction = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+type PrismaTransaction = Parameters<
+  Parameters<typeof prisma.$transaction>[0]
+>[0];
 
+const getDb = (tx?: PrismaTransaction) => tx ?? prisma;
+
+/**
+ * =========================
+ * UPDATE STOCK (MASUK / KELUAR LANGSUNG)
+ * =========================
+ * Digunakan untuk:
+ * - Barang masuk gudang
+ * - Barang keluar NON-SPK
+ */
 export async function updateStock(
   itemId: string,
   quantity: number,
@@ -11,169 +23,141 @@ export async function updateStock(
   userId: string,
   reason: string,
   transactionId?: string,
-  tx?: PrismaTransaction
+  tx?: PrismaTransaction,
 ) {
-  const db = tx || prisma;
-  
-  const item = await db.item.findUnique({
-    where: { id: itemId },
-  })
+  const db = getDb(tx);
 
-  if (!item) {
-    throw new Error('Item not found')
+  const item = await db.item.findUnique({ where: { id: itemId } });
+  if (!item) throw new Error("Item not found");
+
+  const prev = item.currentStock;
+  const next =
+    type === TransactionType.MASUK ? prev + quantity : prev - quantity;
+
+  if (next < 0) {
+    throw new Error("Stock tidak boleh minus");
   }
 
-  const previousStock = item.currentStock
-  let newStock: number
-
-  if (type === TransactionType.MASUK) {
-    newStock = previousStock + quantity
-  } else {
-    newStock = previousStock - quantity
-    if (newStock < 0) {
-      throw new Error('Stock tidak boleh minus')
-    }
-  }
-
-  // Update stock
   await db.item.update({
     where: { id: itemId },
-    data: { currentStock: newStock },
-  })
+    data: { currentStock: next },
+  });
 
-  // Create stock history
   await db.stockHistory.create({
     data: {
       itemId,
-      transactionId: transactionId || null,
       userId,
-      previousStock,
+      transactionId: transactionId ?? null,
+      previousStock: prev,
       quantity: type === TransactionType.MASUK ? quantity : -quantity,
-      newStock,
+      newStock: next,
       reason,
     },
-  })
+  });
 
-  return { previousStock, newStock }
+  return { previousStock: prev, newStock: next };
 }
 
 /**
- * Reserve stock untuk SPK IN_PROGRESS
- * Meningkatkan reservedStock tanpa mengurangi currentStock
- * Stok di-reserve agar tidak bisa digunakan SPK lain
+ * =========================
+ * RESERVE STOCK (SPK DIBUAT)
+ * =========================
+ * - currentStock ❌ TIDAK berubah
+ * - reservedStock +qty
  */
 export async function reserveStock(
   itemId: string,
   quantity: number,
   userId: string,
   reason: string,
-  tx?: PrismaTransaction
+  tx?: PrismaTransaction,
 ) {
-  const db = tx || prisma;
-  
-  const item = await db.item.findUnique({
-    where: { id: itemId },
-  })
+  const db = getDb(tx);
+  const qty = Number(quantity);
 
-  if (!item) {
-    throw new Error('Item not found')
-  }
+  const item = await db.item.findUnique({ where: { id: itemId } });
+  if (!item) throw new Error("Item not found");
 
-  // Cek available stock (currentStock - reservedStock)
-  const availableStock = item.currentStock - item.reservedStock
-  if (availableStock < quantity) {
+  const available = item.currentStock - item.reservedStock;
+  if (available < qty) {
     throw new Error(
-      `Stok tidak mencukupi. Stok tersedia: ${availableStock}, dibutuhkan: ${quantity}`
-    )
+      `Stok tidak mencukupi. Available: ${available}, dibutuhkan: ${qty}`,
+    );
   }
 
-  const previousReservedStock = item.reservedStock
-  const newReservedStock = previousReservedStock + quantity
-
-  // Update reserved stock
   await db.item.update({
     where: { id: itemId },
-    data: { reservedStock: newReservedStock },
-  })
+    data: {
+      reservedStock: { increment: qty },
+    },
+  });
 
-  // Create stock history untuk tracking reservasi
+  // ❗ tidak mengubah stok fisik → history quantity = 0
   await db.stockHistory.create({
     data: {
       itemId,
       userId,
+      transactionId: null,
       previousStock: item.currentStock,
-      quantity: 0, // Tidak mengubah currentStock, hanya reservedStock
+      quantity: 0,
       newStock: item.currentStock,
       reason: `[RESERVE] ${reason}`,
     },
-  })
-
-  return { 
-    previousReservedStock, 
-    newReservedStock,
-    availableStock: item.currentStock - newReservedStock
-  }
+  });
 }
 
 /**
- * Release reserved stock (untuk SPK dibatalkan atau status kembali ke QUEUE)
- * Mengurangi reservedStock tanpa mengubah currentStock
+ * =========================
+ * RELEASE / REJECT SPK
+ * =========================
+ * - currentStock ❌ TIDAK berubah
+ * - reservedStock -qty
  */
 export async function releaseReservedStock(
   itemId: string,
   quantity: number,
   userId: string,
   reason: string,
-  tx?: PrismaTransaction
+  tx?: PrismaTransaction,
 ) {
-  const db = tx || prisma;
-  
-  const item = await db.item.findUnique({
-    where: { id: itemId },
-  })
+  const db = getDb(tx);
+  const qty = Number(quantity);
 
-  if (!item) {
-    throw new Error('Item not found')
+  const item = await db.item.findUnique({ where: { id: itemId } });
+  if (!item) throw new Error("Item not found");
+
+  if (item.reservedStock < qty) {
+    throw new Error("Reserved stock tidak mencukupi");
   }
 
-  if (item.reservedStock < quantity) {
-    throw new Error(
-      `Reserved stock tidak mencukupi. Reserved: ${item.reservedStock}, akan di-release: ${quantity}`
-    )
-  }
-
-  const previousReservedStock = item.reservedStock
-  const newReservedStock = previousReservedStock - quantity
-
-  // Update reserved stock
   await db.item.update({
     where: { id: itemId },
-    data: { reservedStock: newReservedStock },
-  })
+    data: {
+      reservedStock: { decrement: qty },
+    },
+  });
 
-  // Create stock history untuk tracking release
   await db.stockHistory.create({
     data: {
       itemId,
       userId,
+      transactionId: null,
       previousStock: item.currentStock,
-      quantity: 0, // Tidak mengubah currentStock, hanya reservedStock
+      quantity: 0,
       newStock: item.currentStock,
       reason: `[RELEASE] ${reason}`,
     },
-  })
-
-  return { 
-    previousReservedStock, 
-    newReservedStock,
-    availableStock: item.currentStock - newReservedStock
-  }
+  });
 }
 
 /**
- * Fulfill reserved stock (mengambil barang dari gudang)
- * Mengurangi BOTH reservedStock DAN currentStock
- * Dipanggil saat barang FROM_STOCK benar-benar diambil dari gudang
+ * =========================
+ * FULFILL RESERVED STOCK
+ * =========================
+ * Barang benar-benar keluar gudang
+ *
+ * - reservedStock -qty
+ * - currentStock -qty
  */
 export async function fulfillReservedStock(
   itemId: string,
@@ -181,89 +165,65 @@ export async function fulfillReservedStock(
   userId: string,
   reason: string,
   transactionId?: string,
-  tx?: PrismaTransaction
+  tx?: PrismaTransaction,
 ) {
-  const db = tx || prisma;
-  
-  const item = await db.item.findUnique({
-    where: { id: itemId },
-  })
+  const db = getDb(tx);
+  const qty = Number(quantity);
 
-  if (!item) {
-    throw new Error('Item not found')
+  const item = await db.item.findUnique({ where: { id: itemId } });
+  if (!item) throw new Error("Item not found");
+
+  if (item.reservedStock < qty) {
+    throw new Error("Reserved stock tidak mencukupi");
   }
 
-  if (item.reservedStock < quantity) {
-    throw new Error(
-      `Reserved stock tidak mencukupi. Reserved: ${item.reservedStock}, akan di-fulfill: ${quantity}`
-    )
+  if (item.currentStock < qty) {
+    throw new Error("Stock fisik tidak mencukupi");
   }
 
-  if (item.currentStock < quantity) {
-    throw new Error(
-      `Current stock tidak mencukupi. Current: ${item.currentStock}, akan di-fulfill: ${quantity}`
-    )
-  }
+  const prev = item.currentStock;
 
-  const previousReservedStock = item.reservedStock
-  const previousCurrentStock = item.currentStock
-  const newReservedStock = previousReservedStock - quantity
-  const newCurrentStock = previousCurrentStock - quantity
-
-  // Update both reservedStock and currentStock
   await db.item.update({
     where: { id: itemId },
-    data: { 
-      reservedStock: newReservedStock,
-      currentStock: newCurrentStock,
+    data: {
+      reservedStock: { decrement: qty },
+      currentStock: { decrement: qty },
     },
-  })
+  });
 
-  // Create stock history
   await db.stockHistory.create({
     data: {
       itemId,
-      transactionId: transactionId || null,
       userId,
-      previousStock: previousCurrentStock,
-      quantity: -quantity,
-      newStock: newCurrentStock,
+      transactionId: transactionId ?? null,
+      previousStock: prev,
+      quantity: -qty,
+      newStock: prev - qty,
       reason: `[FULFILL] ${reason}`,
     },
-  })
-
-  return { 
-    previousReservedStock, 
-    newReservedStock,
-    previousCurrentStock,
-    newCurrentStock,
-    availableStock: newCurrentStock - newReservedStock
-  }
+  });
 }
 
 /**
- * Get available stock (currentStock - reservedStock)
- * Stok yang benar-benar tersedia untuk SPK baru
+ * =========================
+ * GET AVAILABLE STOCK
+ * =========================
  */
 export async function getAvailableStock(
   itemId: string,
-  tx?: PrismaTransaction
+  tx?: PrismaTransaction,
 ): Promise<number> {
-  const db = tx || prisma;
-  
+  const db = getDb(tx);
+
   const item = await db.item.findUnique({
     where: { id: itemId },
     select: {
       currentStock: true,
       reservedStock: true,
-    }
-  })
+    },
+  });
 
-  if (!item) {
-    throw new Error('Item not found')
-  }
+  if (!item) throw new Error("Item not found");
 
-  return item.currentStock - item.reservedStock
+  return item.currentStock - item.reservedStock;
 }
-
-

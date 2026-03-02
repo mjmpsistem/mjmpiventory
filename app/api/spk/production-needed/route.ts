@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     // Ambil SPK dengan status IN_PROGRESS yang punya item PRODUCTION
     const spks = await prisma.spk.findMany({
       where: {
-        status: SpkStatus.IN_PROGRESS,
+        status: { in: [SpkStatus.IN_PROGRESS] },
         spkItems: {
           some: {
             fulfillmentMethod: FulfillmentMethod.PRODUCTION,
@@ -44,6 +44,16 @@ export async function GET(request: NextRequest) {
             username: true,
           },
         },
+        materialUsages: {
+          include: {
+            material: {
+              include: {
+                itemType: true,
+                unit: true,
+              },
+            },
+          },
+        },
         spkItems: {
           where: {
             fulfillmentMethod: FulfillmentMethod.PRODUCTION,
@@ -54,17 +64,7 @@ export async function GET(request: NextRequest) {
               select: {
                 id: true,
                 nama_barang: true,
-                spesifikasi_barang: true,
-              },
-            },
-            materialUsages: {
-              include: {
-                material: {
-                  include: {
-                    itemType: true,
-                    unit: true,
-                  },
-                },
+                spesifikasi_tambahan: true,
               },
             },
           },

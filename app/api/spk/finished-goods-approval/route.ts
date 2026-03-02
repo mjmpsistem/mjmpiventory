@@ -11,7 +11,7 @@ import {
 /* =========================
    TYPE AMAN (ANTI TS ERROR)
 ========================= */
-type SpkWithRelations = Awaited<ReturnType<typeof prisma.spk.findMany>>[number];
+type SpkWithRelations = any;
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,7 +24,13 @@ export async function GET(request: NextRequest) {
     const spks: SpkWithRelations[] = await prisma.spk.findMany({
       where: {
         status: {
-          in: [SpkStatus.IN_PROGRESS, SpkStatus.READY_TO_SHIP],
+          in: [
+            SpkStatus.IN_PROGRESS,
+            SpkStatus.READY_TO_SHIP,
+            SpkStatus.PARTIAL,
+            SpkStatus.SHIPPING,
+            SpkStatus.DONE,
+          ],
         },
       },
       include: {
@@ -49,36 +55,54 @@ export async function GET(request: NextRequest) {
               include: { unit: true },
             },
             salesOrder: true,
+            progressHistory: {
+              orderBy: { createdAt: "desc" },
+              take: 1
+            }
           },
         },
         purchaseOrders: {
           select: {
             id: true,
             status: true,
+            isReceived: true,
+            kepada: true,
+            nomorPO: true,
+            items: {
+              select: {
+                namaBarang: true,
+              }
+            }
+          },
+        },
+        shipping: {
+          select: {
+            id: true,
+            fotoBuktiUrl: true,
           },
         },
       },
       orderBy: { createdAt: "asc" },
     });
 
-    const result = spks.map((spk) => {
+    const result = spks.map((spk: any) => {
       const fromStockItems = spk.spkItems.filter(
-        (i) => i.fulfillmentMethod === FulfillmentMethod.FROM_STOCK,
+        (i: any) => i.fulfillmentMethod === FulfillmentMethod.FROM_STOCK,
       );
 
       const productionItems = spk.spkItems.filter(
-        (i) => i.fulfillmentMethod === FulfillmentMethod.PRODUCTION,
+        (i: any) => i.fulfillmentMethod === FulfillmentMethod.PRODUCTION,
       );
 
       const tradingItems = spk.spkItems.filter(
-        (i) => i.fulfillmentMethod === FulfillmentMethod.TRADING,
+        (i: any) => i.fulfillmentMethod === FulfillmentMethod.TRADING,
       );
 
       // FROM STOCK: COMPLETED / FULFILLED
       const fromStockCompleted =
         fromStockItems.length === 0 ||
         fromStockItems.every(
-          (i) =>
+          (i: any) =>
             i.fulfillmentStatus === FulfillmentStatus.COMPLETED ||
             i.fulfillmentStatus === FulfillmentStatus.FULFILLED,
         );
@@ -91,33 +115,42 @@ export async function GET(request: NextRequest) {
       ];
       const productionCompleted =
         productionItems.length === 0 ||
-        productionItems.every((i) =>
+        productionItems.every((i: any) =>
           PRODUCTION_DONE_STATUSES.includes(i.fulfillmentStatus),
         );
 
-      // TRADING: PO APPROVED / DONE
+      // TRADING: PO APPROVED / DONE AND isReceived true
       const tradingApproved =
         tradingItems.length === 0 ||
         spk.purchaseOrders.some(
-          (po) => po.status === "APPROVED" || po.status === "DONE",
+          (po: any) => (po.status === "APPROVED" || po.status === "DONE") && po.isReceived === true,
         );
 
-      // RULE FINAL
+      // RULE BARU: SPK bisa di-approve jika ada saldo readyQty > 0 di salah satu itemnya
+      // DAN jika ada item TRADING, PO harus sudah APPROVED/DONE
+      // DAN jika ada item PRODUCTION, status harus sudah DONE/COMPLETED
       const canApprove =
-        fromStockCompleted && productionCompleted && tradingApproved;
+        spk.spkItems.some((i: any) => i.readyQty > 0) &&
+        tradingApproved &&
+        productionCompleted;
 
       return {
         id: spk.id,
         spkNumber: spk.spkNumber,
         status: spk.status,
+        warehouseApproved: spk.warehouseApproved,
         tglSpk: spk.tglSpk.toISOString(),
         deadline: spk.deadline?.toISOString() ?? null,
         lead: spk.lead,
         user: spk.user,
-        spkItems: spk.spkItems.map((item) => ({
+        spkItems: spk.spkItems.map((item: any) => ({
           id: item.id,
           namaBarang: item.namaBarang,
           qty: item.qty,
+          readyQty: item.readyQty,
+          producedQty: item.producedQty,
+          shippedQty: item.shippedQty,
+          approvedQty: item.approvedQty, // Include approvedQty
           satuan: item.satuan,
           fulfillmentMethod: item.fulfillmentMethod,
           fulfillmentStatus: item.fulfillmentStatus,
@@ -130,13 +163,31 @@ export async function GET(request: NextRequest) {
             : null,
           salesOrder: item.salesOrder
             ? {
-                spesifikasi_barang: item.salesOrder.spesifikasi_barang,
+                spesifikasi_tambahan: item.salesOrder.spesifikasi_tambahan,
               }
             : null,
+          lastStage: item.progressHistory?.[0]?.stage || null,
+          poInfo: spk.purchaseOrders.find((po: any) => 
+            (po.status === "APPROVED" || po.status === "DONE") && 
+            po.isReceived &&
+            po.items.some((poi: any) => poi.namaBarang.toLowerCase().trim() === item.namaBarang.toLowerCase().trim())
+          ) ? {
+            nomorPO: spk.purchaseOrders.find((po: any) => 
+              (po.status === "APPROVED" || po.status === "DONE") && 
+              po.isReceived &&
+              po.items.some((poi: any) => poi.namaBarang.toLowerCase().trim() === item.namaBarang.toLowerCase().trim())
+            ).nomorPO,
+            kepada: spk.purchaseOrders.find((po: any) => 
+              (po.status === "APPROVED" || po.status === "DONE") && 
+              po.isReceived &&
+              po.items.some((poi: any) => poi.namaBarang.toLowerCase().trim() === item.namaBarang.toLowerCase().trim())
+            ).kepada
+          } : null
         })),
         hasProductionItems: productionItems.length > 0,
         hasTradingItems: tradingItems.length > 0,
         tradingApproved,
+        fotoBuktiUrl: spk.shipping?.fotoBuktiUrl || null,
         canApprove,
       };
     });

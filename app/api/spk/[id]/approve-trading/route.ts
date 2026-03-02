@@ -113,26 +113,8 @@ export async function POST(
             },
           }));
 
-        const itemRef = inventoryItem?.id;
-
-        if (itemRef) {
-          await tx.transaction.create({
-            data: {
-              date: new Date(),
-              type: TransactionType.KELUAR,
-              source: TransactionSource.TRADING,
-              itemId: itemRef,
-              quantity: item.qty,
-              destination: spk.lead.nama_toko || "Customer",
-              spkNumber: spk.spkNumber,
-              memo: `Barang keluar SPK ${spk.spkNumber} - ${item.namaBarang} (TRADING)`,
-              userId: authUser.userId,
-            },
-          });
-        } else {
-          missingItems.push(item.namaBarang);
-        }
-
+        // 🔒 FIX: Hapus Transaction.create di sini. 
+        // Pencatatan barang keluar (Transaction KELUAR) sekarang dilakukan di gate terakhir: KONFIRMASI KEDATANGAN.
         await tx.spkItem.update({
           where: { id: item.id },
           data: { fulfillmentStatus: FulfillmentStatus.FULFILLED },
@@ -140,6 +122,22 @@ export async function POST(
       }
 
       await updateSpkStatusIfReady(spk.id, tx);
+
+      // ✅ CREATE NOTIFICATION for Trading Approval
+      try {
+        console.log(`[NOTIFICATION_LOG] Creating notification for Trading Approval: SPK #${spk.spkNumber}`);
+        await tx.notification.create({
+          data: {
+            title: "Approval Barang Trading",
+            message: `Item trading untuk SPK #${spk.spkNumber} telah disetujui keluar.`,
+            type: "SUCCESS",
+            targetUrl: "/approval-barang-jadi",
+          },
+        });
+        console.log(`[NOTIFICATION_LOG] Notification created successfully for Trading SPK #${spk.spkNumber}`);
+      } catch (notifyError: any) {
+        console.error("[NOTIFICATION_LOG] Failed to create notification for approve-trading:", notifyError.message || notifyError);
+      }
     });
 
     // ✅ SEKARANG AMAN

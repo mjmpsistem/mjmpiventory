@@ -110,6 +110,9 @@ export async function POST(request: NextRequest) {
       vendor,
       hargaSatuan,
       ukuran,
+      warna,
+      ketebalan,
+      spesifikasi_tambahan,
       kuantitas,
       isTrading,
     } = body
@@ -149,6 +152,9 @@ export async function POST(request: NextRequest) {
     // Field khusus untuk Barang Jadi
     if (category === 'BARANG_JADI') {
       if (ukuran) itemData.ukuran = ukuran
+      if (warna) itemData.warna = warna
+      if (ketebalan) itemData.ketebalan = ketebalan
+      if (spesifikasi_tambahan) itemData.spesifikasi_tambahan = spesifikasi_tambahan
       if (kuantitas !== undefined) itemData.kuantitas = kuantitas
       if (isTrading) itemData.isTrading = true
     }

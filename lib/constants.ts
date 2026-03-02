@@ -2,8 +2,13 @@
 
 export const UserRole = {
   SUPERADMIN: "SUPERADMIN",
+  FOUNDER: "FOUNDER",
+  KEPALA_INVENTORY: "KEPALA_INVENTORY",
+  ADMIN: "ADMIN",
+  // Old roles for compatibility
   ADMIN_GUDANG: "ADMIN_GUDANG",
   STAFF_GUDANG: "STAFF_GUDANG",
+  DRIVER: "DRIVER",
 } as const;
 
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
@@ -32,6 +37,8 @@ export const TransactionSource = {
   ORDER_CUSTOMER: "ORDER_CUSTOMER", // Order Customer lewat web produksi (FROM_STOCK)
   BAHAN_BAKU: "BAHAN_BAKU", // Barang stok dijadikan bahan baku
   DAUR_ULANG: "DAUR_ULANG", // Barang di daur ulang kembali
+  RESERVASI: "RESERVASI", // Reservasi stok untuk SPK/Produksi
+  RESERVASI_RELEASE: "RESERVASI_RELEASE", // Melepaskan reservasi stok
   // Trading dan Production untuk barang keluar (setelah approve di approval barang jadi)
 } as const;
 
@@ -63,6 +70,9 @@ export const SpkStatus = {
   COMPLETED: "COMPLETED",
   CANCELLED: "CANCELLED",
   READY_TO_SHIP: "READY_TO_SHIP",
+  SHIPPING: "SHIPPING",
+  PARTIAL: "PARTIAL",
+  DONE: "DONE",
 } as const;
 
 export type SpkStatus = (typeof SpkStatus)[keyof typeof SpkStatus];
@@ -78,6 +88,9 @@ export type FulfillmentMethod =
 
 export const FulfillmentStatus = {
   PENDING: "PENDING", // belum fix
+  RESERVED: "RESERVED",
+  READY: "READY", // ✅ siap dikirim
+  DONE: "DONE", // ✅ siap diproduksi/approve
   COMPLETED: "COMPLETED", // ✅ siap approve
   FULFILLED: "FULFILLED", // stok sudah dipotong
   CANCELLED: "CANCELLED", // dibatalkan

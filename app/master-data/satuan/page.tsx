@@ -170,14 +170,14 @@ export default function SatuanPage() {
         <Breadcrumb />
 
         {/* ================= HEADER ================= */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
           <button
             onClick={() => {
               setEditingUnit(null);
               setName("");
               setShowModal(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all font-medium"
+            className="w-full sm:w-auto h-11 flex items-center justify-center gap-2 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition-all font-bold text-sm active:scale-95"
           >
             <Plus size={18} />
             Tambah Satuan

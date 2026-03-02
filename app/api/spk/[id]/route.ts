@@ -29,6 +29,11 @@ export async function GET(
             username: true,
           },
         },
+        materialUsages: {
+          include: {
+            material: true,
+          },
+        },
         spkItems: {
           include: {
             salesOrder: true,
@@ -36,11 +41,6 @@ export async function GET(
               include: {
                 itemType: true,
                 unit: true,
-              },
-            },
-            materialUsages: {
-              include: {
-                material: true,
               },
             },
           },
@@ -159,18 +159,61 @@ export async function PUT(
  */
 async function handleSpkInProgress(spk: any, userId: string) {
   return await prisma.$transaction(async (tx) => {
-    // Hanya update status SPK menjadi IN_PROGRESS (stok sudah di-reserve saat QUEUE)
+    // 1) Update status SPK dan flag persetujuan inventory
     const updatedSpk = await tx.spk.update({
       where: { id: spk.id },
-      data: { status: SpkStatus.IN_PROGRESS },
+      data: { 
+        status: SpkStatus.IN_PROGRESS,
+        inventoryApproved: true,
+        inventoryApprovedAt: new Date(),
+      },
       include: {
         lead: true,
         user: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
+          select: { id: true, name: true, username: true },
+        },
+        spkItems: true,
+      },
+    });
+
+    // 2. Untuk item FROM_STOCK, otomatis isi readyQty = qty (Siap Kirim)
+    let hasFromStock = false;
+    for (const item of updatedSpk.spkItems) {
+      if (item.fulfillmentMethod === FulfillmentMethod.FROM_STOCK) {
+        hasFromStock = true;
+        await tx.spkItem.update({
+          where: { id: item.id },
+          data: { 
+            readyQty: item.qty,
+            fulfillmentStatus: FulfillmentStatus.RESERVED // Pastikan statusnya minimal reserved
           },
+        });
+      }
+    }
+
+    // 2.1) Jika ada item FROM_STOCK, kirim notifikasi ke Approval Barang Jadi
+    if (hasFromStock) {
+      try {
+        await tx.notification.create({
+          data: {
+            title: "Siap Approve (Stok)",
+            message: `SPK #${updatedSpk.spkNumber} memiliki barang dari stok yang siap di-approve.`,
+            type: "INFO",
+            targetUrl: "/approval-barang-jadi",
+          },
+        });
+      } catch (e) {
+        console.error("Failed to notify from handleSpkInProgress", e);
+      }
+    }
+
+    // Ambil data terbaru setelah update item
+    const finalSpk = await tx.spk.findUnique({
+      where: { id: spk.id },
+      include: {
+        lead: true,
+        user: {
+          select: { id: true, name: true, username: true },
         },
         spkItems: {
           include: {
@@ -181,7 +224,7 @@ async function handleSpkInProgress(spk: any, userId: string) {
       },
     });
 
-    return NextResponse.json({ spk: updatedSpk });
+    return NextResponse.json({ spk: finalSpk });
   });
 }
 

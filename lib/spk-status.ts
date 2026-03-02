@@ -27,7 +27,29 @@ export async function updateSpkStatusIfReady(
 
   if (!spk) return null;
 
-  const allFinished = spk.spkItems.every((item) => {
+  // 2. Untuk item FROM_STOCK, otomatis isi readyQty = qty (Siap Kirim)
+  // HANYA jika readyQty masih 0 untuk menghindari inflasi saldo saat status berubah/update
+  for (const item of spk.spkItems) {
+    if (item.fulfillmentMethod === FulfillmentMethod.FROM_STOCK && (item.readyQty || 0) === 0) {
+      await tx.spkItem.update({
+        where: { id: item.id },
+        data: {
+          readyQty: item.qty,
+          fulfillmentStatus: FulfillmentStatus.RESERVED
+        },
+      });
+    }
+  }
+
+  // Re-fetch SPK after potential updates to spkItems
+  const updatedSpk = await tx.spk.findUnique({
+    where: { id: spkId },
+    include: { spkItems: true },
+  });
+
+  if (!updatedSpk) return null; // Should not happen if spk was found initially
+
+  const allFinished = updatedSpk.spkItems.every((item: any) => {
     if (item.fulfillmentMethod === FulfillmentMethod.PRODUCTION) {
       return PRODUCTION_DONE_STATUSES.has(item.fulfillmentStatus);
     }
@@ -35,12 +57,9 @@ export async function updateSpkStatusIfReady(
     return item.fulfillmentStatus === FulfillmentStatus.FULFILLED;
   });
 
-  if (allFinished && spk.status !== SpkStatus.READY_TO_SHIP) {
-    return tx.spk.update({
-      where: { id: spkId },
-      data: { status: SpkStatus.READY_TO_SHIP },
-    });
+  if (allFinished && updatedSpk.status !== SpkStatus.READY_TO_SHIP) {
+    // Menghapus update otomatis ke READY_TO_SHIP agar melewati approval gudang secara manual
   }
 
-  return spk;
+  return updatedSpk;
 }
