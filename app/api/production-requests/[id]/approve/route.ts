@@ -28,10 +28,7 @@ export async function POST(
       );
     }
 
-    const authUser = await requireAuth(request, [
-      UserRole.SUPERADMIN,
-      UserRole.ADMIN_GUDANG,
-    ]);
+    const authUser = await requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN_GUDANG]);
 
     const productionRequest = await prisma.productionRequest.findUnique({
       where: { id },

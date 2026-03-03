@@ -8,7 +8,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    requireAuth(request, [UserRole.SUPERADMIN, UserRole.ADMIN_GUDANG, UserRole.STAFF_GUDANG])
+    requireAuth(request, [
+      UserRole.SUPERADMIN,
+      UserRole.FOUNDER,
+      UserRole.KEPALA_INVENTORY,
+      UserRole.ADMIN,
+      UserRole.ADMIN_GUDANG,
+      UserRole.STAFF_GUDANG
+    ])
     
     const { id } = await params;
     
@@ -42,7 +49,12 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    requireAuth(request, [UserRole.SUPERADMIN, UserRole.ADMIN_GUDANG])
+    requireAuth(request, [
+      UserRole.SUPERADMIN,
+      UserRole.FOUNDER,
+      UserRole.KEPALA_INVENTORY,
+      UserRole.ADMIN_GUDANG
+    ])
     
     const { id } = await params;
     const body = await request.json()

@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getProductionEfficiency } from "@/app/actions/dashboard-analytics";
-import { PieChart, ArrowRight, Loader2 } from "lucide-react";
+import { PieChart, ArrowRight } from "lucide-react";
 
 interface EfficiencyData {
   input: number;
@@ -10,30 +8,7 @@ interface EfficiencyData {
   waste: number;
 }
 
-export function ProductionEfficiencyChart({ dateFrom, dateTo }: { dateFrom?: string; dateTo?: string }) {
-  const [data, setData] = useState<EfficiencyData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      const res = await getProductionEfficiency(dateFrom, dateTo);
-      if (res.success && res.data) {
-        setData(res.data);
-      }
-      setLoading(false);
-    }
-    fetchData();
-  }, [dateFrom, dateTo]);
-
-  if (loading) {
-    return (
-       <div className="bg-white rounded-2xl shadow-sm p-6 flex items-center justify-center h-full min-h-[250px]">
-        <Loader2 className="animate-spin text-blue-500" />
-      </div>
-    );
-  }
-
+export function ProductionEfficiencyChart({ data }: { data: EfficiencyData }) {
   if (!data) return null;
 
   const total = data.input + data.output + data.waste;

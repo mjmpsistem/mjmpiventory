@@ -8,7 +8,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    requireAuth(request, [UserRole.SUPERADMIN, UserRole.ADMIN_GUDANG]);
+    requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN_GUDANG]);
 
     const { id } = await params; // ✅ UNWRAP PARAMS
 

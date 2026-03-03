@@ -1,8 +1,6 @@
 "use client";
 
-import { Recycle, TrendingUp, AlertCircle, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { getWasteDashboardSummary } from "@/app/actions/dashboard-waste";
+import { Recycle, TrendingUp, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface WasteSummary {
@@ -14,7 +12,7 @@ interface WasteSummary {
   }[];
   recentRecycled: {
     id: string;
-    date: Date;
+    date: string;
     itemName: string;
     quantity: number;
     unit: string;
@@ -22,31 +20,7 @@ interface WasteSummary {
   }[];
 }
 
-export function WasteSummaryCard({ dateFrom, dateTo }: { dateFrom?: string; dateTo?: string }) {
-  const [data, setData] = useState<WasteSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchData() {
-        // Only show loading if no data previously or it feels like a refresh
-        setLoading(true); 
-        const res = await getWasteDashboardSummary(dateFrom, dateTo);
-        if (res.success && res.data) {
-            setData(res.data);
-        }
-        setLoading(false);
-    }
-    fetchData();
-  }, [dateFrom, dateTo]);
-
-  if (loading && !data) {
-    return (
-      <div className="bg-white rounded-2xl shadow-sm p-6 flex items-center justify-center h-full min-h-[200px]">
-        <Loader2 className="animate-spin text-blue-500" />
-      </div>
-    );
-  }
-
+export function WasteSummaryCard({ data }: { data: WasteSummary }) {
   if (!data) return null;
 
   return (

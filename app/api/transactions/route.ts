@@ -9,6 +9,9 @@ export async function GET(request: NextRequest) {
   try {
     requireAuth(request, [
       UserRole.SUPERADMIN,
+      UserRole.FOUNDER,
+      UserRole.KEPALA_INVENTORY,
+      UserRole.ADMIN,
       UserRole.ADMIN_GUDANG,
       UserRole.STAFF_GUDANG,
     ]);
@@ -79,6 +82,9 @@ export async function POST(request: NextRequest) {
     // ✅ PANGGIL SEKALI & SIMPAN
     const authUser = requireAuth(request, [
       UserRole.SUPERADMIN,
+      UserRole.FOUNDER,
+      UserRole.KEPALA_INVENTORY,
+      UserRole.ADMIN,
       UserRole.ADMIN_GUDANG,
     ]);
 

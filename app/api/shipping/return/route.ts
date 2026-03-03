@@ -6,11 +6,7 @@ import { releaseReservedStock, updateStock } from "@/lib/stock";
 
 export async function POST(request: NextRequest) {
   try {
-    const authUser = requireAuth(request, [
-      UserRole.SUPERADMIN,
-      UserRole.ADMIN_GUDANG,
-      UserRole.STAFF_GUDANG,
-    ]);
+    const authUser = requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN, UserRole.ADMIN_GUDANG, UserRole.STAFF_GUDANG]);
 
     const body = await request.json();
     const { shippingItemId, qty, reason, notes } = body;

@@ -5,7 +5,14 @@ import { UserRole, TransactionType } from '@/lib/constants'
 
 export async function GET(request: NextRequest) {
   try {
-    requireAuth(request, [UserRole.SUPERADMIN, UserRole.ADMIN_GUDANG, UserRole.STAFF_GUDANG])
+    requireAuth(request, [
+      UserRole.SUPERADMIN,
+      UserRole.FOUNDER,
+      UserRole.KEPALA_INVENTORY,
+      UserRole.ADMIN,
+      UserRole.ADMIN_GUDANG,
+      UserRole.STAFF_GUDANG
+    ])
     
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
@@ -96,7 +103,12 @@ async function generateNextItemCode(category: string): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
-    requireAuth(request, [UserRole.SUPERADMIN, UserRole.ADMIN_GUDANG])
+    requireAuth(request, [
+      UserRole.SUPERADMIN,
+      UserRole.FOUNDER,
+      UserRole.KEPALA_INVENTORY,
+      UserRole.ADMIN_GUDANG
+    ])
     
     const body = await request.json()
     const {

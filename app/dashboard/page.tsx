@@ -135,6 +135,32 @@ interface DashboardData {
     user: string;
     isOverdue: boolean;
   }>;
+  // Consolidated Data
+  wasteSummary: {
+    totalWeight: number;
+    breakdown: Array<{ name: string; quantity: number; unit: string }>;
+    recentRecycled: Array<{
+      id: string;
+      date: string;
+      itemName: string;
+      quantity: number;
+      unit: string;
+      user: string;
+    }>;
+  };
+  productionEfficiency: {
+    input: number;
+    output: number;
+    waste: number;
+  };
+  slowMovingItems: Array<{
+    id: string;
+    code: string;
+    name: string;
+    stock: number;
+    unit: string;
+    totalOut90Days: number;
+  }>;
 }
 
 export default function DashboardPage() {
@@ -703,7 +729,7 @@ export default function DashboardPage() {
             animate="visible"
             className="h-full"
           >
-            <WasteSummaryCard dateFrom={dateFrom} dateTo={dateTo} />
+            <WasteSummaryCard data={data.wasteSummary} />
           </motion.div>
 
           {/* Efisiensi Produksi */}
@@ -714,7 +740,7 @@ export default function DashboardPage() {
             animate="visible"
             className="h-full"
           >
-            <ProductionEfficiencyChart dateFrom={dateFrom} dateTo={dateTo} />
+            <ProductionEfficiencyChart data={data.productionEfficiency} />
           </motion.div>
 
           {/* Slow Moving Items */}
@@ -725,7 +751,7 @@ export default function DashboardPage() {
             animate="visible"
             className="h-full"
           >
-            <SlowMovingItemsCard />
+            <SlowMovingItemsCard items={data.slowMovingItems} />
           </motion.div>
         </div>
 

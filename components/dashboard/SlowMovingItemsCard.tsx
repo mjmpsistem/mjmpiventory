@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getSlowMovingItems } from "@/app/actions/dashboard-analytics";
-import { AlertTriangle, TrendingDown, Loader2, PackageX } from "lucide-react";
+import { TrendingDown, PackageX } from "lucide-react";
 
 interface SlowItem {
   id: string;
@@ -13,29 +11,9 @@ interface SlowItem {
   totalOut90Days: number;
 }
 
-export function SlowMovingItemsCard() {
-  const [items, setItems] = useState<SlowItem[]>([]);
-  const [loading, setLoading] = useState(true);
+export function SlowMovingItemsCard({ items }: { items: SlowItem[] }) {
+  if (!items) return null;
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      const res = await getSlowMovingItems();
-      if (res.success && res.data) {
-        setItems(res.data);
-      }
-      setLoading(false);
-    }
-    fetchData();
-  }, []);
-
-  if (loading) {
-     return (
-       <div className="bg-white rounded-2xl shadow-sm p-6 flex items-center justify-center h-full min-h-[250px]">
-        <Loader2 className="animate-spin text-blue-500" />
-      </div>
-    );
-  }
 
   return (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden h-full flex flex-col">
