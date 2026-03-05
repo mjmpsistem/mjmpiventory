@@ -8,8 +8,8 @@ export async function POST(request: NextRequest) {
     // 1. Authenticate
     requireAuth(request, [
       UserRole.SUPERADMIN,
-      UserRole.ADMIN_GUDANG,
-      UserRole.STAFF_GUDANG,
+     
+     
       UserRole.DRIVER
     ]);
 

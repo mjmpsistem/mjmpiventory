@@ -12,9 +12,7 @@ export async function GET(
       UserRole.SUPERADMIN,
       UserRole.FOUNDER,
       UserRole.KEPALA_INVENTORY,
-      UserRole.ADMIN,
-      UserRole.ADMIN_GUDANG,
-      UserRole.STAFF_GUDANG
+      UserRole.ADMIN
     ])
     
     const { id } = await params;
@@ -52,8 +50,7 @@ export async function PUT(
     requireAuth(request, [
       UserRole.SUPERADMIN,
       UserRole.FOUNDER,
-      UserRole.KEPALA_INVENTORY,
-      UserRole.ADMIN_GUDANG
+      UserRole.KEPALA_INVENTORY
     ])
     
     const { id } = await params;

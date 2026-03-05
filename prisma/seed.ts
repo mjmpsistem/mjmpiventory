@@ -27,7 +27,7 @@ async function main() {
       username: 'admin',
       password: adminPassword,
       name: 'Admin Gudang',
-      role: UserRole.ADMIN_GUDANG,
+      role: UserRole.ADMIN,
     },
   })
 

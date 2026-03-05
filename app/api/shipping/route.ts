@@ -5,7 +5,7 @@ import { UserRole, SpkStatus, FulfillmentStatus } from "@/lib/constants";
 
 export async function GET(request: NextRequest) {
   try {
-    requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN, UserRole.ADMIN_GUDANG, UserRole.STAFF_GUDANG]);
+    requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN]);
 
     // Ambil SPK yang siap dikirim (READY_TO_SHIP, PARTIAL, atau IN_PROGRESS dengan readyQty > 0)
     // SPK yang statusnya READY_TO_SHIP, PARTIAL, IN_PROGRESS dan SHIPPED (jika masih ada yang siap kirim)
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const authUser = requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN, UserRole.ADMIN_GUDANG, UserRole.STAFF_GUDANG]);
+    const authUser = requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN]);
 
     const body = await request.json();
     const { spkIds, driverId, estimasi, catatan, items } = body;
@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const authUser = requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN, UserRole.ADMIN_GUDANG, UserRole.STAFF_GUDANG]);
+    const authUser = requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN]);
 
     const body = await request.json();
     const { shippingId, penerimaNama, waktuSampai, catatanSelesai, fotoBuktiUrl } = body;

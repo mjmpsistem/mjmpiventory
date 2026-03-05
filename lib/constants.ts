@@ -5,9 +5,6 @@ export const UserRole = {
   FOUNDER: "FOUNDER",
   KEPALA_INVENTORY: "KEPALA_INVENTORY",
   ADMIN: "ADMIN",
-  // Old roles for compatibility
-  ADMIN_GUDANG: "ADMIN_GUDANG",
-  STAFF_GUDANG: "STAFF_GUDANG",
   DRIVER: "DRIVER",
 } as const;
 

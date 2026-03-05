@@ -6,6 +6,12 @@ import { useNotifications } from "./NotificationProvider";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  UserRole,
+  SpkStatus,
+  FulfillmentMethod,
+  FulfillmentStatus,
+} from "@/lib/constants";
+import {
   Warehouse,
   LayoutDashboard,
   Database,
@@ -318,13 +324,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const getMenuItemsWithBadges = () => {
-    const role = currentUser.role;
-    const isSuper = role === "SUPERADMIN" || role === "FOUNDER";
-    const isKepala = role === "KEPALA_INVENTORY";
-    const isAdmin = role === "ADMIN";
+    const rawRole = (currentUser.role || "").toUpperCase();
+    const isSuper = rawRole === UserRole.SUPERADMIN || rawRole === UserRole.FOUNDER;
+    const isKepala = rawRole === UserRole.KEPALA_INVENTORY;
+    const isAdmin = rawRole === "ADMIN";
+    const isDriver = rawRole === "DRIVER";
+    const isLoading = currentUser.id === "loading" || !currentUser.role || currentUser.role === "...";
 
     return menuItems
       .filter((item) => {
+        if (isLoading) return item.href === "/dashboard" || item.href === "/tentang-aplikasi";
         if (isSuper) return true;
         if (isKepala) {
           return item.href !== "/approval-barang-jadi";
@@ -338,7 +347,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ];
           return allowed.includes(item.href);
         }
-        return true;
+        if (isDriver) {
+          return ["/dashboard", "/shipping", "/tentang-aplikasi"].includes(item.href);
+        }
+        return item.href === "/dashboard"; // Safe fallback
       })
       .map((item) => {
         // Clone the item
@@ -903,7 +915,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="text-right leading-tight">
                       <p className="text-sm font-medium text-white">
-                        {currentUser.name}
+                        {currentUser.name || currentUser.username || "User"}
                       </p>
                       <p className="text-xs text-blue-100">
                         {currentUser.role}

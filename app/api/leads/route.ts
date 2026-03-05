@@ -6,7 +6,7 @@ import { UserRole } from "@/lib/constants";
 
 export async function GET(request: NextRequest) {
   try {
-    requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN, UserRole.ADMIN_GUDANG, UserRole.STAFF_GUDANG]);
+    requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN]);
 
     const leads = await prisma.lead.findMany({
       include: {

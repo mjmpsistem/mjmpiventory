@@ -9,9 +9,7 @@ export async function GET(request: NextRequest) {
       UserRole.SUPERADMIN,
       UserRole.FOUNDER,
       UserRole.KEPALA_INVENTORY,
-      UserRole.ADMIN,
-      UserRole.ADMIN_GUDANG,
-      UserRole.STAFF_GUDANG
+      UserRole.ADMIN
     ])
     
     const { searchParams } = new URL(request.url)
@@ -70,13 +68,12 @@ export async function POST(request: NextRequest) {
     requireAuth(request, [
       UserRole.SUPERADMIN,
       UserRole.FOUNDER,
-      UserRole.KEPALA_INVENTORY,
-      UserRole.ADMIN_GUDANG
+      UserRole.KEPALA_INVENTORY
     ])
     
     const body = await request.json()
     const { kepada, nomorPO, tanggal, jatuhTempo, keteranganTambahan, hormatKami, items, spkId, status } = body
-    const authUser = requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN_GUDANG])
+    const authUser = requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY])
 
     if (!kepada || !nomorPO || !tanggal || !jatuhTempo || !items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(

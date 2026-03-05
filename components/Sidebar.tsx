@@ -263,7 +263,7 @@ export function Sidebar({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -6 }}
             >
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.name}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.name || user.username || "User"}</p>
               <p className="text-xs text-gray-500">{user.role}</p>
             </motion.div>
           )}

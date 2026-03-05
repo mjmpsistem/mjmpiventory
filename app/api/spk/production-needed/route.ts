@@ -10,7 +10,7 @@ import { UserRole, SpkStatus, FulfillmentMethod } from "@/lib/constants";
  */
 export async function GET(request: NextRequest) {
   try {
-    requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN, UserRole.ADMIN_GUDANG, UserRole.STAFF_GUDANG]);
+    requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN]);
 
     const [rawSpks, spkReturs] = await Promise.all([
       prisma.spk.findMany({

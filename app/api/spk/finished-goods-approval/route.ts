@@ -15,7 +15,7 @@ type SpkWithRelations = any;
 
 export async function GET(request: NextRequest) {
   try {
-    requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN, UserRole.ADMIN_GUDANG, UserRole.STAFF_GUDANG]);
+    requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN]);
 
     const [spks, spkReturs] = await Promise.all([
       prisma.spk.findMany({

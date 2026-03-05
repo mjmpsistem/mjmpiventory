@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       UserRole.FOUNDER,
       UserRole.KEPALA_INVENTORY,
       UserRole.ADMIN,
-      UserRole.ADMIN_GUDANG,
+     
       UserRole.STAFF_GUDANG
     ])
     
