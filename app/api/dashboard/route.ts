@@ -9,9 +9,7 @@ export async function GET(request: NextRequest) {
       UserRole.SUPERADMIN,
       UserRole.FOUNDER,
       UserRole.KEPALA_INVENTORY,
-      UserRole.ADMIN,
-     
-      UserRole.STAFF_GUDANG
+      UserRole.ADMIN
     ])
     
     const { searchParams } = new URL(request.url)
