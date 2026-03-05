@@ -39,6 +39,19 @@ export async function GET(
             },
           },
         },
+        spkRetur: {
+          include: {
+            parentSpk: {
+              include: { lead: true }
+            },
+            returnItems: {
+              include: { 
+                item: true,
+                originalSpkItem: { include: { salesOrder: true } }
+              }
+            }
+          }
+        },
       },
     });
 

@@ -9,6 +9,8 @@ import {
   TransactionType,
 } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY, UserRole.ADMIN, UserRole.ADMIN_GUDANG, UserRole.STAFF_GUDANG]);
@@ -59,6 +61,36 @@ export async function GET(request: NextRequest) {
           },
         },
 
+        spkRetur: {
+          include: {
+            parentSpk: {
+              include: {
+                lead: true
+              }
+            },
+            returnItems: {
+              include: {
+                item: true,
+                originalSpkItem: {
+                  include: {
+                    salesOrder: true
+                  }
+                }
+              }
+            },
+            materialUsages: {
+              include: {
+                material: {
+                  include: {
+                    itemType: true,
+                    unit: true
+                  }
+                }
+              }
+            }
+          }
+        },
+
         // existing
         items: {
           include: {
@@ -76,7 +108,12 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ requests });
+    const formattedRequests = requests.map((req: any) => ({
+      ...req,
+      spkNumber: req.spkNumber || req.spkReturNumber
+    }));
+
+    return NextResponse.json({ requests: formattedRequests });
   } catch (error: any) {
     if (error.message === "Unauthorized" || error.message === "Forbidden") {
       return NextResponse.json({ error: error.message }, { status: 403 });
@@ -132,12 +169,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create production request dan link ke SpkItem
+    // Determine if it's a regular SPK or SPK Retur
+    const spk = await prisma.spk.findUnique({ where: { spkNumber } });
+    const spkRetur = await prisma.spkRetur.findUnique({ where: { spkNumber } });
+
+    if (!spk && !spkRetur) {
+      return NextResponse.json(
+        { error: `Nomor SPK ${spkNumber} tidak ditemukan` },
+        { status: 400 },
+      );
+    }
+
+    // Create production request dan link ke SpkItem / SpkReturItem
     const productionRequest = await prisma.$transaction(async (tx) => {
       // Create production request
       const newRequest = await tx.productionRequest.create({
         data: {
-          spkNumber,
+          spkNumber: spk ? spkNumber : null,
+          spkReturNumber: spkRetur ? spkNumber : null,
           productName,
           memo,
           userId: authUser.userId,
@@ -170,25 +219,23 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Update SpkItem dengan productionRequestId
-      // Cari SPK berdasarkan spkNumber
-      const spk = await tx.spk.findUnique({
-        where: { spkNumber },
-        include: {
-          spkItems: {
-            where: {
-              fulfillmentMethod: "PRODUCTION",
-              productionRequestId: null,
-            },
-          },
-        },
-      });
-
       if (spk) {
         // Update semua SpkItem dengan fulfillmentMethod = PRODUCTION yang belum punya productionRequestId
         await tx.spkItem.updateMany({
           where: {
             spkId: spk.id,
+            fulfillmentMethod: "PRODUCTION",
+            productionRequestId: null,
+          },
+          data: {
+            productionRequestId: newRequest.id,
+          },
+        });
+      } else if (spkRetur) {
+        // Update semua SpkReturItem dengan fulfillmentMethod = PRODUCTION yang belum punya productionRequestId
+        await tx.spkReturItem.updateMany({
+          where: {
+            spkReturId: spkRetur.id,
             fulfillmentMethod: "PRODUCTION",
             productionRequestId: null,
           },

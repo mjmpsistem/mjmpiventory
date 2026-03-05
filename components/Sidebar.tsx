@@ -17,6 +17,7 @@ interface MenuChildItem {
   href: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   badge?: number;
+  returBadge?: number;
 }
 
 interface MenuItem extends MenuChildItem {
@@ -90,6 +91,11 @@ export function Sidebar({
                     {item.badge > 99 ? "99+" : item.badge}
                   </span>
                 ) : null}
+                {item.returBadge ? (
+                  <span className="bg-orange-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-md shadow-sm border border-orange-600 animate-pulse">
+                    R:{item.returBadge}
+                  </span>
+                ) : null}
                 <ChevronDown
                   size={16}
                   className={`transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
@@ -133,6 +139,11 @@ export function Sidebar({
                           {child.badge > 99 ? '99+' : child.badge}
                         </span>
                       ) : null}
+                      {child.returBadge ? (
+                        <span className="bg-orange-500 text-white text-[10px] font-black px-1 py-0.5 rounded shadow-sm">
+                          R:{child.returBadge}
+                        </span>
+                      ) : null}
                     </Link>
                   );
                 })}
@@ -170,6 +181,16 @@ export function Sidebar({
           `}>
             {item.badge > 99 ? '99+' : item.badge}
           </span>
+        ) : null}
+        {item.returBadge && sidebarOpen ? (
+          <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md ml-1 shadow-sm">
+            R:{item.returBadge}
+          </span>
+        ) : null}
+        {item.returBadge && !sidebarOpen && !item.badge ? (
+           <span className="absolute top-2 right-2 w-4 h-4 bg-orange-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border border-white dark:border-gray-900">
+             R
+           </span>
         ) : null}
       </Link>
     );

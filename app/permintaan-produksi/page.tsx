@@ -41,7 +41,7 @@ interface ProductionRequest {
   approvedAt?: string | null;
   user: { name: string };
   items: ProductionRequestItem[];
-  spk: {
+  spk?: {
     id: string;
     spkItems: SpkItem[];
     lead: {
@@ -49,6 +49,18 @@ interface ProductionRequest {
       alamat_toko: string;
       no_telp: string;
     };
+  };
+  spkReturNumber?: string;
+  spkRetur?: {
+    id: string;
+    parentSpk: {
+      lead: {
+        nama_toko: string;
+        alamat_toko: string;
+        no_telp: string;
+      };
+    };
+    returnItems: any[];
   };
 }
 
@@ -370,9 +382,10 @@ export default function PermintaanProduksiPage() {
 
   const filteredRequests = requests.filter((req) => {
     const lowerQuery = searchQuery.toLowerCase();
+    const spkIdentifier = req.spkNumber || req.spkReturNumber || "";
     const matchesSearch =
-      req.spkNumber.toLowerCase().includes(lowerQuery) ||
-      req.productName.toLowerCase().includes(lowerQuery);
+      spkIdentifier.toLowerCase().includes(lowerQuery) ||
+      (req.productName || "").toLowerCase().includes(lowerQuery);
 
     const matchStatus = filterStatus ? req.status === filterStatus : true;
 
@@ -688,7 +701,11 @@ export default function PermintaanProduksiPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {(paginatedData as ProductionRequest[]).map((request) => (
+                {(paginatedData as ProductionRequest[]).map((request) => {
+                  const spkIdentifier = request.spkNumber || request.spkReturNumber;
+                  const targetItems = request.spk?.spkItems || request.spkRetur?.returnItems || [];
+
+                  return (
                   <div
                     key={request.id}
                     className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition"
@@ -698,7 +715,7 @@ export default function PermintaanProduksiPage() {
                       <div className="flex justify-between items-start mb-4">
                         <div>
                           <h3 className="text-lg font-semibold text-gray-900">
-                            SPK {request.spkNumber}
+                            SPK {spkIdentifier}
                           </h3>
                           <p className="text-xs text-gray-500">
                             Dibuat: {formatDate(request.createdAt)}
@@ -725,11 +742,11 @@ export default function PermintaanProduksiPage() {
                           Produk / Item Produksi
                         </p>
 
-                        {request.spk &&
-                        request.spk.spkItems &&
-                        request.spk.spkItems.length > 0 ? (
+                        {targetItems.length > 0 ? (
                           <ul className="space-y-2">
-                            {request.spk.spkItems.map((item) => (
+                            {targetItems.map((item) => {
+                              const spec = item.salesOrder?.spesifikasi_tambahan || item.originalSpkItem?.salesOrder?.spesifikasi_tambahan;
+                              return (
                               <li
                                 key={item.id}
                                 className="text-sm text-gray-600 border-b border-gray-100 last:border-0 pb-2"
@@ -758,7 +775,8 @@ export default function PermintaanProduksiPage() {
                                       {/* Tracking Status */}
                                       <div className="flex flex-wrap gap-1.5 mt-1.5">
                                         {(() => {
-                                          const onTruck = item.shipping_item?.reduce((sum: number, si: any) => {
+                                          const shippingList = (item as any).shipping_item || [];
+                                          const onTruck = shippingList.reduce((sum: number, si: any) => {
                                             if (!si.shipping?.waktuSampai) return sum + si.qty;
                                             return sum;
                                           }, 0) || 0;
@@ -788,7 +806,7 @@ export default function PermintaanProduksiPage() {
                                         <button
                                           onClick={() => {
                                             setSelectedItemForProgress({
-                                              spkId: request.spk?.id as string,
+                                              spkId: request.spk?.id || request.spkRetur?.id || "",
                                               item: item,
                                             });
                                             setShowProgressModal(true);
@@ -800,13 +818,13 @@ export default function PermintaanProduksiPage() {
                                       )}
                                     </div>
                                   </div>
-                                {item.salesOrder?.spesifikasi_tambahan && (
+                                {spec && (
                                   <div className="text-xs text-gray-500 italic">
-                                    Spec: {item.salesOrder.spesifikasi_tambahan}
+                                    Spec: {spec}
                                   </div>
                                 )}
                               </li>
-                            ))}
+                            )})}
                           </ul>
                         ) : (
                           // Fallback if spkItems not available (backward compatibility)
@@ -831,16 +849,16 @@ export default function PermintaanProduksiPage() {
                         {request.status === "PENDING" && (
                           <button
                             onClick={() => {
-                              const productsArr = request.spk?.spkItems?.map(
-                                (i) =>
-                                  i.salesOrder?.spesifikasi_tambahan
-                                    ? `${i.namaBarang} (${i.salesOrder.spesifikasi_tambahan})`
-                                    : i.namaBarang,
+                              const productsArr = targetItems?.map(
+                                (i) => {
+                                  const s = i.salesOrder?.spesifikasi_tambahan || i.originalSpkItem?.salesOrder?.spesifikasi_tambahan;
+                                  return s ? `${i.namaBarang} (${s})` : i.namaBarang;
+                                }
                               ) || [request.productName];
 
                               setFormData({
                                 id: request.id,
-                                spkNumber: request.spkNumber,
+                                spkNumber: spkIdentifier || "",
                                 products: productsArr,
                                 memo: request.memo,
                                 items: request.items.map((item) => ({
@@ -871,7 +889,8 @@ export default function PermintaanProduksiPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>

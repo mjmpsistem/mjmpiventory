@@ -1,0 +1,16 @@
+--- SPKs ---
+[SPK-20260302-001] Status: READY_TO_SHIP, warehouseApproved: true
+  - Sendok Plastik: Qty=20, Ready=25, Approved=25, Shipped=0
+  - Mertua Merah: Qty=50, Ready=50, Approved=50, Shipped=0
+[SPK-20260303-002] Status: PARTIAL, warehouseApproved: true
+  - Wadah Mika Plastik: Qty=100, Ready=0, Approved=0, Shipped=0
+  - Mertua Merah: Qty=30, Ready=30, Approved=30, Shipped=0
+[SPK-20260304-003] Status: PARTIAL, warehouseApproved: false
+  - Plastik PE: Qty=10, Ready=0, Approved=10, Shipped=10
+  - Mika Plastik: Qty=50, Ready=0, Approved=40, Shipped=40
+
+--- Returs ---
+[SPK-20260302-001-1] Status: PARTIAL
+  - Sendok Plastik: Qty=10, Ready=5, Approved=5, Shipped=0
+[SPK-20260304-003-1] Status: SHIPPING
+  - Mika Plastik: Qty=10, Ready=0, Approved=10, Shipped=0

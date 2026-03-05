@@ -155,6 +155,7 @@ export default function ShippingPage() {
           return {
             spkItemId: item.id,
             qty: qty,
+            isRetur: selectedSpk.isRetur // Pass the isRetur flag
           };
         })
         .filter((item: any) => item.qty > 0.01);
@@ -407,7 +408,12 @@ export default function ShippingPage() {
                 <div className="px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-900 dark:text-gray-100">{item.spkNumber}</span>
+                       {item.isRetur && (
+                         <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-black border border-red-200">
+                           RETUR
+                         </span>
+                       )}
+                       <span className="font-bold text-gray-900 dark:text-gray-100">{item.spkNumber}</span>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                         item.status === "DONE" ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800" :
                         item.status === "SHIPPING" ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800" :

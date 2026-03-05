@@ -51,6 +51,8 @@ interface SpkForApproval {
   user: UserInfo;
   spkItems: SpkItem[];
   hasProductionItems: boolean;
+  productionCompleted: boolean; // ✅ DARI BACKEND
+  tradingApproved: boolean; // ✅ DARI BACKEND
   canApprove: boolean; // ✅ DARI BACKEND
 }
 
@@ -117,53 +119,81 @@ export default function ApprovalBarangJadiPage() {
   };
 
   const handleApprove = async (spk: SpkForApproval) => {
-    if (!spk.canApprove) {
-      alert("SPK belum bisa di-approve karena masih menunggu produksi selesai");
-      return;
-    }
-
-    const fromStockItems = spk.spkItems.filter(
+    // 1. Identifikasi item yang siap di-approve
+    const fromStockOrTradingItems = spk.spkItems.filter(
       (i) =>
-        i.fulfillmentMethod === "FROM_STOCK" &&
-        i.fulfillmentStatus === "COMPLETED"
+        (i.fulfillmentMethod === "FROM_STOCK" && i.fulfillmentStatus === "COMPLETED") ||
+        (i.fulfillmentMethod === "TRADING" && i.fulfillmentStatus === "DONE")
     );
 
-    if (fromStockItems.length === 0) {
-      alert("Tidak ada item FROM_STOCK COMPLETED yang bisa di-approve");
+    const productionItems = spk.spkItems.filter(
+      (i) =>
+        i.fulfillmentMethod === "PRODUCTION" && i.fulfillmentStatus === "DONE"
+    );
+
+    if (fromStockOrTradingItems.length === 0 && productionItems.length === 0) {
+      alert("Tidak ada item yang siap untuk di-approve saat ini.");
       return;
     }
 
-    if (
-      !confirm(
-        `Approve barang jadi untuk SPK ${spk.spkNumber}? Stok akan dikurangkan dan transaksi barang keluar akan tercatat.`
-      )
-    ) {
+    const message = `Approve barang jadi untuk SPK ${spk.spkNumber}?\n\n` +
+      (fromStockOrTradingItems.length > 0 ? `- ${fromStockOrTradingItems.length} item Gudang/Trading\n` : "") +
+      (productionItems.length > 0 ? `- ${productionItems.length} item Produksi\n` : "");
+
+    if (!confirm(message)) {
       return;
     }
 
     try {
       setSubmittingId(spk.id);
 
-      const res = await fetch(`/api/spk/${spk.id}/fulfill`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          spkItemIds: fromStockItems.map((i) => i.id),
-        }),
-      });
+      const promises = [];
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.error || "Terjadi kesalahan saat approve barang jadi");
-        return;
+      // Approve FROM_STOCK & TRADING
+      if (fromStockOrTradingItems.length > 0) {
+        promises.push(
+          fetch(`/api/spk/${spk.id}/fulfill`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              spkItemIds: fromStockOrTradingItems.map((i) => i.id),
+            }),
+          }).then(async (res) => {
+            if (!res.ok) {
+              const d = await res.json();
+              throw new Error(d.error || "Gagal approve item gudang/trading");
+            }
+            return res.json();
+          })
+        );
       }
 
-      alert(data.message || "Barang jadi berhasil di-approve");
+      // Approve PRODUCTION
+      if (productionItems.length > 0) {
+        promises.push(
+          fetch(`/api/spk/${spk.id}/approve-production`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              spkItemIds: productionItems.map((i) => i.id),
+            }),
+          }).then(async (res) => {
+            if (!res.ok) {
+              const d = await res.json();
+              throw new Error(d.error || "Gagal approve item produksi");
+            }
+            return res.json();
+          })
+        );
+      }
+
+      await Promise.all(promises);
+
+      alert("Persetujuan barang jadi berhasil diproses.");
       fetchSpks();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Terjadi kesalahan saat approve barang jadi");
+      alert(error.message || "Terjadi kesalahan saat proses approval.");
     } finally {
       setSubmittingId(null);
     }
@@ -442,16 +472,16 @@ export default function ApprovalBarangJadiPage() {
                   {productionItems.length > 0 && (
                     <div
                       className={`mx-4 mb-3 rounded-lg px-4 py-3 text-xs ${
-                        canApprove
+                        spk.productionCompleted
                           ? "bg-emerald-50 text-emerald-800"
                           : "bg-amber-50 text-amber-800"
                       }`}
                     >
-                      {!canApprove ? (
+                      {!spk.productionCompleted ? (
                         <>
                           <div className="flex items-center gap-2 mb-2 font-semibold">
                             <span className="text-base">⏳</span>
-                            <span>Produksi belum selesai</span>
+                            <span>Produksi sedang berjalan (Gudang tetap bisa Approve item Ready)</span>
                           </div>
 
                           <div className="space-y-1">

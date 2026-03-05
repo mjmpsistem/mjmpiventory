@@ -66,8 +66,9 @@ interface SpkForApproval {
   hasTradingItems: boolean;
   tradingApproved: boolean;
   warehouseApproved: boolean; // ✅ DARI BACKEND
-  fotoBuktiUrl?: string | null; // ✅ DARI BACKEND
-  canApprove: boolean; // ✅ DARI BACKEND
+  fotoBuktiUrl?: string | null;
+  canApprove: boolean;
+  isRetur: boolean; // ✅ DARI BACKEND
 }
 
 export default function ApprovalBarangJadiPage() {
@@ -137,15 +138,13 @@ export default function ApprovalBarangJadiPage() {
 
       const processedSpks = (data.spks || []).map((spk: SpkForApproval) => ({
         ...spk,
-        spkItems: spk.spkItems.map((item) => ({
-          ...item,
-          // 💡 Logic: Yang bisa di-approve adalah readyQty FISIK
-          // dikurangi yang SUDAH di-approve sebelumnya (tapi belum dikirim)
-          availableToApprove: Math.max(
-            0,
-            item.readyQty - (item.onTruckQty || 0),
-          ),
-        })),
+        spkItems: spk.spkItems.map((item) => {
+          const available = Math.max(0, (item.readyQty || 0) - (item.approvedQty || 0));
+          return {
+            ...item,
+            availableToApprove: available
+          };
+        }),
       }));
 
       const sortedSpks = processedSpks.sort(
@@ -170,23 +169,8 @@ export default function ApprovalBarangJadiPage() {
 
   // ✅ FINAL
   const canApproveSpk = (spk: SpkForApproval) => {
-    // 1. Minimal ada satu item dengan readyQty > 0
-    const hasReadyItem = spk.spkItems.some((i) => i.readyQty > 0);
-
-    // 2. Jika ada item TRADING, maka PO harus sudah disetujui
-    const isTradingApproved = !spk.hasTradingItems || spk.tradingApproved;
-
-    // 3. Jika ada item PRODUCTION, maka item produksi tersebut harus sudah selesai
-    const productionItems = spk.spkItems.filter(
-      (i) => i.fulfillmentMethod === "PRODUCTION",
-    );
-    const isProductionApproved =
-      productionItems.length === 0 ||
-      productionItems.every((i) =>
-        ["DONE", "COMPLETED", "FULFILLED"].includes(i.fulfillmentStatus),
-      );
-
-    return hasReadyItem && isTradingApproved && isProductionApproved;
+    // 1. Minimal ada satu item yang siap di-approve (Bisa Approved > 0)
+    return spk.spkItems.some((i) => i.availableToApprove > 0);
   };
 
   const handleApprove = async (spk: SpkForApproval) => {
@@ -708,6 +692,11 @@ export default function ApprovalBarangJadiPage() {
                                 ? "PARTIAL"
                                 : "WAITING"}
                         </span>
+                        {spk.isRetur && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200 shadow-sm">
+                            RETUR
+                          </span>
+                        )}
                       </div>
 
                       <div className="text-xs text-gray-600 mt-1 font-medium">
@@ -749,19 +738,7 @@ export default function ApprovalBarangJadiPage() {
                       {Object.entries(groups).map(([key, group]) => {
                         if (group.items.length === 0) return null;
 
-                        const groupCanApprove =
-                          group.items.some((i) => i.readyQty > 0) &&
-                          (group.type === "INTERNAL"
-                            ? group.items
-                                .filter(
-                                  (i) => i.fulfillmentMethod === "PRODUCTION",
-                                )
-                                .every((i) =>
-                                  ["DONE", "COMPLETED", "FULFILLED"].includes(
-                                    i.fulfillmentStatus,
-                                  ),
-                                )
-                            : true); // PO items are matched only if PO is approved/received on backend
+                        const groupCanApprove = group.items.some((i) => i.availableToApprove > 0);
 
                         const groupAllApproved = group.items.every(
                           (i) => (i.approvedQty || 0) >= i.qty,

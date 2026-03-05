@@ -93,6 +93,8 @@ export async function POST(
 
         const createdTransactions = [];
 
+        const targetSpkNumber = productionRequest.spkNumber || productionRequest.spkReturNumber;
+
         for (const [itemId, quantity] of Object.entries(groupedItems)) {
           const numQuantity = Number(quantity);
           const transaction = await tx.transaction.create({
@@ -103,8 +105,8 @@ export async function POST(
               itemId: itemId,
               quantity: numQuantity,
               destination: "Produksi",
-              spkNumber: productionRequest.spkNumber,
-              memo: `Permintaan produksi SPK ${productionRequest.spkNumber}: ${productionRequest.memo}`,
+              spkNumber: targetSpkNumber,
+              memo: `Permintaan produksi SPK ${targetSpkNumber}: ${productionRequest.memo}`,
               userId: authUser.userId,
             },
           });
@@ -113,7 +115,7 @@ export async function POST(
             itemId,
             numQuantity,
             authUser.userId,
-            `Permintaan produksi SPK ${productionRequest.spkNumber}: ${productionRequest.memo}`,
+            `Permintaan produksi SPK ${targetSpkNumber}: ${productionRequest.memo}`,
             transaction.id,
             tx,
           );
@@ -121,54 +123,107 @@ export async function POST(
           createdTransactions.push(transaction);
         }
 
-        // ✅ LOGIKA BARU: Update Status SPK ke IN_PROGRESS agar muncul di Approval Barang Jadi
-        const spk = await tx.spk.findUnique({
-          where: { spkNumber: productionRequest.spkNumber },
-          include: { spkItems: true }
-        });
-
-        if (spk && spk.status === SpkStatus.QUEUE) {
-          console.log(`[SYNC] Moving SPK #${spk.spkNumber} to IN_PROGRESS upon PR approval`);
-          
-          // 1) Update status SPK dan flag persetujuan inventory
-          const updatedSpk = await tx.spk.update({
-            where: { id: spk.id },
-            data: { 
-              status: SpkStatus.IN_PROGRESS,
-              inventoryApproved: true,
-              inventoryApprovedAt: new Date(),
-            },
+        // ✅ LOGIKA BARU: Update Status SPK/SpkRetur ke IN_PROGRESS agar muncul di Approval Barang Jadi
+        if (productionRequest.spkNumber) {
+          const spk = await tx.spk.findUnique({
+            where: { spkNumber: productionRequest.spkNumber },
             include: { spkItems: true }
           });
 
-          // 2) Untuk item FROM_STOCK, otomatis isi readyQty = qty (Siap Kirim)
-          let hasFromStock = false;
-          for (const item of updatedSpk.spkItems) {
-            if (item.fulfillmentMethod === FulfillmentMethod.FROM_STOCK) {
-              hasFromStock = true;
-              await tx.spkItem.update({
-                where: { id: item.id },
-                data: { 
-                  readyQty: item.qty,
-                  fulfillmentStatus: FulfillmentStatus.RESERVED 
-                },
-              });
+          if (spk && spk.status === SpkStatus.QUEUE) {
+            console.log(`[SYNC] Moving SPK #${spk.spkNumber} to IN_PROGRESS upon PR approval`);
+            
+            // 1) Update status SPK dan flag persetujuan inventory
+            const updatedSpk = await tx.spk.update({
+              where: { id: spk.id },
+              data: { 
+                status: SpkStatus.IN_PROGRESS,
+                inventoryApproved: true,
+                inventoryApprovedAt: new Date(),
+              },
+              include: { spkItems: true }
+            });
+
+            // 2) Untuk item FROM_STOCK, otomatis isi readyQty = qty (Siap Kirim)
+            let hasFromStock = false;
+            for (const item of updatedSpk.spkItems) {
+              if (item.fulfillmentMethod === FulfillmentMethod.FROM_STOCK) {
+                hasFromStock = true;
+                await tx.spkItem.update({
+                  where: { id: item.id },
+                  data: { 
+                    readyQty: item.qty,
+                    fulfillmentStatus: FulfillmentStatus.RESERVED 
+                  },
+                });
+              }
+            }
+
+            // 3) Kirim notifikasi jika ada barang stok yang siap di-approve
+            if (hasFromStock) {
+              try {
+                await tx.notification.create({
+                  data: {
+                    title: "Siap Approve (Stok)",
+                    message: `SPK #${updatedSpk.spkNumber} memiliki barang dari stok yang siap di-approve.`,
+                    type: "INFO",
+                    targetUrl: "/approval-barang-jadi",
+                  },
+                });
+              } catch (e) {
+                console.error("Failed to notify from PR approval", e);
+              }
             }
           }
+        } else if (productionRequest.spkReturNumber) {
+          const spkRetur = await (tx as any).spkRetur.findUnique({
+            where: { spkNumber: productionRequest.spkReturNumber },
+            include: { returnItems: true }
+          });
 
-          // 3) Kirim notifikasi jika ada barang stok yang siap di-approve
-          if (hasFromStock) {
-            try {
-              await tx.notification.create({
-                data: {
-                  title: "Siap Approve (Stok)",
-                  message: `SPK #${updatedSpk.spkNumber} memiliki barang dari stok yang siap di-approve.`,
-                  type: "INFO",
-                  targetUrl: "/approval-barang-jadi",
-                },
-              });
-            } catch (e) {
-              console.error("Failed to notify from PR approval", e);
+          if (spkRetur && spkRetur.status === "QUEUE") {
+            console.log(`[SYNC] Moving SPK Retur #${spkRetur.spkNumber} to IN_PROGRESS upon PR approval`);
+            
+            // 1) Update status SPK Retur
+            const updatedSpkRetur = await (tx as any).spkRetur.update({
+              where: { id: spkRetur.id },
+              data: { 
+                status: "IN_PROGRESS",
+                inventoryApproved: true,
+                inventoryApprovedAt: new Date(),
+              },
+              include: { returnItems: true }
+            });
+
+            // 2) Untuk item FROM_STOCK, otomatis isi readyQty = qty (Siap Kirim)
+            let hasFromStock = false;
+            for (const item of updatedSpkRetur.returnItems) {
+              if (item.fulfillmentMethod === "FROM_STOCK") {
+                hasFromStock = true;
+                await (tx as any).spkReturItem.update({
+                  where: { id: item.id },
+                  data: { 
+                    readyQty: item.qty,
+                    fulfillmentStatus: "RESERVED"
+                  },
+                });
+              }
+            }
+
+            // 3) Kirim notifikasi jika ada barang stok yang siap di-approve
+            if (hasFromStock) {
+              try {
+                await tx.notification.create({
+                  data: {
+                    title: "Siap Approve Retur (Stok)",
+                    message: `SPK Retur #${updatedSpkRetur.spkNumber} memiliki barang dari stok yang siap di-approve.`,
+                    type: "INFO",
+                    targetUrl: "/approval-barang-jadi",
+                  },
+                });
+              } catch (e) {
+                console.error("Failed to notify from PR approval for Retur", e);
+              }
             }
           }
         }

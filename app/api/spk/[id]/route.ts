@@ -178,7 +178,7 @@ async function handleSpkInProgress(spk: any, userId: string) {
           where: { id: item.id },
           data: { 
             readyQty: item.qty,
-            fulfillmentStatus: FulfillmentStatus.RESERVED // Pastikan statusnya minimal reserved
+            fulfillmentStatus: FulfillmentStatus.COMPLETED // 🔥 Langsung COMPLETED agar bisa d-approve
           },
         });
       }

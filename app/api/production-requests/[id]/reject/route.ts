@@ -28,30 +28,39 @@ export async function POST(
         throw new Error("INVALID_STATUS");
       }
 
-      // 2️⃣ Ambil SPK
-      const spk = await tx.spk.findUnique({
-        where: { spkNumber: productionRequest.spkNumber },
-      });
+      let spk = null;
+      let spkRetur = null;
+      
+      const spkIdentifier = productionRequest.spkNumber || productionRequest.spkReturNumber;
 
-      if (!spk) {
+      if (productionRequest.spkNumber) {
+        // 2️⃣ Ambil SPK
+        spk = await tx.spk.findUnique({
+          where: { spkNumber: productionRequest.spkNumber },
+        });
+      } else if (productionRequest.spkReturNumber) {
+        // Atau ambil SPK Retur
+        spkRetur = await (tx as any).spkRetur.findUnique({
+          where: { spkNumber: productionRequest.spkReturNumber },
+        });
+      }
+
+      if (!spk && !spkRetur) {
         throw new Error("SPK_NOT_FOUND");
       }
 
       // 3️⃣ Release reserved stock (GROUPING BIAR TIDAK DOUBLE)
-      const groupedItems = productionRequest.items.reduce(
-        (acc: Record<string, number>, item) => {
-          acc[item.itemId] = (acc[item.itemId] || 0) + item.quantity;
-          return acc;
-        },
-        {},
-      );
+      const groupedItems: Record<string, number> = {};
+      productionRequest.items.forEach(item => {
+        groupedItems[item.itemId] = (groupedItems[item.itemId] || 0) + item.quantity;
+      });
 
       for (const [itemId, quantity] of Object.entries(groupedItems)) {
         await releaseReservedStock(
           itemId,
           quantity,
           authUser.userId,
-          `Penolakan permintaan produksi SPK ${productionRequest.spkNumber}`,
+          `Penolakan permintaan produksi SPK ${spkIdentifier}`,
           tx,
         );
       }
@@ -65,10 +74,17 @@ export async function POST(
       });
 
       // 5️⃣ Kembalikan SPK ke QUEUE
-      if (spk.status !== SpkStatus.QUEUE) {
+      if (spk && spk.status !== SpkStatus.QUEUE) {
         await tx.spk.update({
           where: { id: spk.id },
           data: { status: SpkStatus.QUEUE },
+        });
+      }
+
+      if (spkRetur && spkRetur.status !== "QUEUE") {
+        await (tx as any).spkRetur.update({
+          where: { id: spkRetur.id },
+          data: { status: "QUEUE" },
         });
       }
     });

@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useNotifications } from "./NotificationProvider";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -28,9 +29,8 @@ import {
   Truck,
 } from "lucide-react";
 import { Sidebar } from "./Sidebar";
-import { Sun, Moon, Bell } from "lucide-react";
+import { Sun, Moon, Bell, Volume2, VolumeX } from "lucide-react";
 import { toast } from "react-toastify";
-import { supabase } from "@/lib/supabase";
 
 interface User {
   id: string;
@@ -44,6 +44,7 @@ interface MenuChildItem {
   href: string;
   icon: any; // Using any for simplicity as Lucide icons have complex types
   badge?: number;
+  returBadge?: number;
 }
 
 interface MenuItem extends MenuChildItem {
@@ -67,32 +68,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     localStorage.setItem("theme", next ? "dark" : "light");
   };
 
-  const [user, setUser] = useState<User | null>(null);
+  const { 
+    user, 
+    notifications, 
+    counts, 
+    audioUnlocked, 
+    audioBlocked, 
+    unlockAudio, 
+    markAsRead 
+  } = useNotifications();
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [counts, setCounts] = useState<{
-    purchaseOrder: number;
-    productionRequest: number;
-    productionApproval: number;
-    gudangApproval: number;
-    waste: number;
-    poPending: number;
-    tradingNeeded: number;
-    shippingReady: number;
-  }>({
-    purchaseOrder: 0,
-    productionRequest: 0,
-    productionApproval: 0,
-    gudangApproval: 0,
-    waste: 0,
-    poPending: 0,
-    tradingNeeded: 0,
-    shippingReady: 0,
-  });
 
   const pathname = usePathname();
   const router = useRouter();
@@ -282,276 +272,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
   };
 
-  const fetchCounts = async () => {
-    try {
-      console.log("Fetching notification counts...");
-      const res = await fetch("/api/notifications/counts");
-      const data = await res.json();
-      console.log("Counts data received:", data);
-      if (data && !data.error) {
-        setCounts(data);
-      } else if (data.error) {
-        console.error("API error fetching counts:", data.error);
-      }
-    } catch (err) {
-      console.error("Failed to fetch notification counts", err);
-    }
-  };
-
-  const fetchNotifications = async () => {
-    try {
-      console.log("Fetching notifications list...");
-      const res = await fetch("/api/notifications");
-      const data = await res.json();
-      console.log("Notifications data received:", data);
-      if (Array.isArray(data)) {
-        setNotifications(data);
-      } else {
-        console.warn("Notifications data is not an array:", data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch notifications", err);
-    }
-  };
-
-  const markAsRead = async (id?: string, all = false) => {
-    try {
-      await fetch("/api/notifications", {
-        method: "PATCH",
-        body: JSON.stringify({ id, all }),
-      });
-      if (all) {
-        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      } else {
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
-        );
-      }
-    } catch (err) {
-      console.error("Failed to mark as read", err);
-    }
-  };
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: string;
-  targetUrl?: string;
-  isRead: boolean;
-  createdAt: string;
-}
-
-
-
-  // --- AUDIO UNLOCKER ---
-  const [audioUnlocked, setAudioUnlocked] = useState(false);
-
-  const unlockAudio = () => {
-    if (audioUnlocked) return;
-    
-    try {
-      // Play a silent or very short sound to "unlock" audio for the session
-      const audio = new Audio("/assets/notif.mp3");
-      audio.volume = 0; // Silent play to prime the browser
-      audio.play()
-        .then(() => {
-          setAudioUnlocked(true);
-          console.log("Audio: System unlocked via user interaction ✅");
-          // Remove listener once unlocked
-          window.removeEventListener("click", unlockAudio);
-        })
-        .catch(() => {
-          // Keep trying on next click if it fails
-        });
-    } catch (e) {
-      console.error("Audio: Unlock failed", e);
-    }
-  };
-
-  useEffect(() => {
-    if (!audioUnlocked) {
-      window.addEventListener("click", unlockAudio);
-    }
-    return () => window.removeEventListener("click", unlockAudio);
-  }, [audioUnlocked]);
-  // ------------------------
-
-  const playNotificationSound = () => {
-    try {
-      const audioUrl = "/assets/notif.mp3";
-      const audio = new Audio(audioUrl);
-      audio.volume = 0.6;
-      
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => console.log("Audio: Notification played successfully ✅"))
-          .catch(error => {
-            console.warn("Audio: Play blocked ❌", error.name);
-            // No more showing toast advice here since we have the unlocker
-          });
-      }
-    } catch (err) {
-      console.error("Audio: Critical error", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchCounts();
-    fetchNotifications();
-
-    const channel = supabase
-      .channel("inventory-notifications")
-      // 1. General Notifications (Manual / System Alerts)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notification" },
-        (payload) => {
-          const newNotif = payload.new as Notification;
-          setNotifications((prev) => {
-            if (prev.some(n => n.id === newNotif.id)) return prev;
-            return [newNotif, ...prev];
-          });
-          fetchCounts(); 
-          toast.info(newNotif.message || "Notifikasi Baru", {
-            icon: <span>🔔</span>,
-            onClick: () => router.push("/notifications")
-          });
-          playNotificationSound();
-        },
-      )
-      // 2. New Purchase Order (Always Alert)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "purchase_order" },
-        () => {
-          fetchCounts();
-          toast.success("Purchase Order Baru telah masuk!", { icon: <span>🛒</span> });
-          playNotificationSound();
-        },
-      )
-      // 3. Production Requests (New & Approved)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "production_request" },
-        (payload) => {
-          fetchCounts();
-          
-          if (payload.eventType === "INSERT") {
-            toast.warning("Permintaan Produksi Baru!", { icon: <span>🏭</span> });
-            playNotificationSound();
-          } else if (payload.eventType === "UPDATE") {
-            const oldRow = payload.old as any;
-            const newRow = payload.new as any;
-            // Only alert if status changed to APPROVED
-            if (oldRow?.status !== "APPROVED" && newRow?.status === "APPROVED") {
-              toast.success(`Produksi untuk ${newRow.productName} disetujui!`, { icon: <span>✅</span> });
-              playNotificationSound();
-            }
-          }
-        },
-      )
-      // 4. Waste Stock (Alert only on NEW waste)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "waste_stock" },
-        () => {
-          fetchCounts();
-          toast.error("Ada barang Waste baru di gudang!", { icon: <span>♻️</span> });
-          playNotificationSound();
-        },
-      )
-      // 5. Silent Updates (SPK changes only update counts/badges)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "spk" },
-        (payload) => {
-          fetchCounts();
-          if (payload.eventType === "UPDATE") {
-             const oldRow = payload.old as any;
-             const newRow = payload.new as any;
-             const readyStatuses = ["READY_TO_SHIP", "PARTIAL"];
-             if (
-               readyStatuses.includes(newRow.status) &&
-               !readyStatuses.includes(oldRow.status)
-             ) {
-               toast.info(`SPK ${newRow.spkNumber} siap dikirim!`, {
-                 icon: <span>📦</span>,
-               });
-               playNotificationSound();
-             }
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "spk_item" },
-        () => fetchCounts(),
-      )
-      // 6. Maintenance (Update counts for other waste changes)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "waste_stock" },
-        () => fetchCounts(),
-      )
-      .subscribe((status) => {
-        console.log("Supabase Realtime Status:", status);
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    // 1️⃣ Ambil cache dulu (sync, tapi dibungkus function)
-    const loadCachedUser = () => {
-      if (typeof window === "undefined") return;
-
-      const cachedUser = sessionStorage.getItem("authUser");
-      if (!cachedUser) return;
-
-      try {
-        const parsed = JSON.parse(cachedUser) as User;
-        if (isMounted) {
-          setUser(parsed);
-        }
-      } catch {
-        sessionStorage.removeItem("authUser");
-      }
-    };
-
-    // 2️⃣ Fetch user dari API
-    const fetchUser = async () => {
-      try {
-        const res = await fetch("/api/auth/me");
-        const data = await res.json();
-
-        if (!isMounted) return;
-
-        if (data.user) {
-          setUser(data.user);
-          sessionStorage.setItem("authUser", JSON.stringify(data.user));
-        } else {
-          sessionStorage.removeItem("authUser");
-          router.push("/login");
-        }
-      } catch {
-        sessionStorage.removeItem("authUser");
-        router.push("/login");
-      }
-    };
-
-    loadCachedUser();
-    fetchUser();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [router]);
 
   // Auto expand menu jika pathname aktif
   useEffect(() => {
@@ -662,16 +382,25 @@ interface Notification {
         const approvalChild = newItem.children?.find(
           (c: MenuChildItem) => c.title === "Approval",
         );
-        if (daftarChild) daftarChild.badge = counts.productionRequest;
-        if (approvalChild) approvalChild.badge = counts.productionApproval;
+
+        if (daftarChild) {
+          daftarChild.badge = counts.productionRequest;
+          daftarChild.returBadge = counts.productionRetur;
+        }
+        if (approvalChild) {
+          approvalChild.badge = counts.productionApprovalNormal;
+          approvalChild.returBadge = counts.productionApprovalRetur;
+        }
       }
 
       if (newItem.title === "Approval Produksi") {
         newItem.badge = counts.gudangApproval;
+        newItem.returBadge = counts.gudangRetur;
       }
 
       if (newItem.title === "Pengiriman") {
         newItem.badge = counts.shippingReady;
+        newItem.returBadge = counts.shippingRetur;
       }
 
       // AGGREGATION LOGIC: If a parent has children with badges, sum them up for the parent badge
@@ -684,6 +413,14 @@ interface Notification {
         // Only set parent badge if it doesn't already have one (or combine them)
         if (totalChildrenBadge > 0) {
           newItem.badge = (newItem.badge || 0) + totalChildrenBadge;
+        }
+
+        const totalChildrenReturBadge = newItem.children.reduce(
+          (sum, child) => sum + (child.returBadge || 0),
+          0,
+        );
+        if (totalChildrenReturBadge > 0) {
+          newItem.returBadge = (newItem.returBadge || 0) + totalChildrenReturBadge;
         }
       }
 
@@ -808,6 +545,11 @@ interface Notification {
                             {item.badge > 99 ? "99+" : item.badge}
                           </span>
                         ) : null}
+                        {item.returBadge ? (
+                          <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                            R:{item.returBadge}
+                          </span>
+                        ) : null}
                       </div>
                       <ChevronDown
                         size={16}
@@ -841,6 +583,11 @@ interface Notification {
                               {child.badge ? (
                                 <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
                                   {child.badge > 99 ? "99+" : child.badge}
+                                </span>
+                              ) : null}
+                              {child.returBadge ? (
+                                <span className="bg-orange-500 text-white text-[10px] font-black px-1 py-0.5 rounded shadow-sm">
+                                  R:{child.returBadge}
                                 </span>
                               ) : null}
                             </Link>
@@ -982,6 +729,22 @@ interface Notification {
                   )}
                 </button>
 
+                {/* Audio Status Indicator */}
+                <button
+                  onClick={unlockAudio}
+                  className={`p-2 rounded-xl transition-all flex items-center gap-2 ${
+                    audioBlocked 
+                      ? "bg-red-50 text-red-500 animate-pulse hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400" 
+                      : !audioUnlocked
+                        ? "bg-amber-50 text-amber-500 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400"
+                        : "text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-slate-800"
+                  }`}
+                  title={audioBlocked ? "Suara Terblokir! Klik untuk aktifkan" : audioUnlocked ? "Suara Aktif" : "Klik untuk aktifkan suara"}
+                >
+                  {audioBlocked ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                  {(audioBlocked || !audioUnlocked) && <span className="text-[10px] font-bold hidden sm:inline uppercase tracking-wider">{audioBlocked ? "Sound Muted" : "Unlock Audio"}</span>}
+                </button>
+
                 {/* Notifications */}
                 <div className="relative">
                   <button
@@ -1089,9 +852,16 @@ interface Notification {
                                   />
 
                                   <div className="flex-1">
-                                    <p className="text-sm font-semibold text-gray-900 dark:text-white leading-snug">
-                                      {n.title}
-                                    </p>
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm font-semibold text-gray-900 dark:text-white leading-snug">
+                                        {n.title}
+                                      </p>
+                                      {n.type === "WARNING" && (
+                                        <span className="bg-orange-100 text-orange-700 text-[9px] font-black px-1 py-0.5 rounded border border-orange-200">
+                                          RETUR
+                                        </span>
+                                      )}
+                                    </div>
 
                                     <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
                                       {n.message}

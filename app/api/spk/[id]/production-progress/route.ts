@@ -26,13 +26,32 @@ export async function POST(
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1) Ambil detail item SPK
-      const item = await tx.spkItem.findUnique({
+      // 1) Ambil detail item (bisa SpkItem atau SpkReturItem)
+      let item = await tx.spkItem.findUnique({
         where: { id: spkItemId },
-      });
+      }) as any;
 
-      if (!item || item.spkId !== spkId) {
+      let isRetur = false;
+      if (!item) {
+        item = await (tx as any).spkReturItem.findUnique({
+          where: { id: spkItemId },
+        });
+        isRetur = true;
+      }
+
+      if (!item) {
         throw new Error("Item SPK tidak ditemukan");
+      }
+
+      // 1.1) Cek Approval Bahan Baku
+      if (item.productionRequestId) {
+        const pr = await tx.productionRequest.findUnique({
+          where: { id: item.productionRequestId },
+          select: { status: true }
+        });
+        if (pr && pr.status === "PENDING") {
+          throw new Error("Produksi belum bisa dicatat karena permintaan bahan baku belum di-approve oleh Admin Gudang.");
+        }
       }
 
       // 2) Fallback: Jika itemId Master Data belum ada, cari berdasarkan nama
@@ -48,55 +67,58 @@ export async function POST(
         if (matchedItem) {
           itemId = matchedItem.id;
         } else {
-          // AUTO-CREATE: Jika benar-benar tidak ada di Master Data, buat otomatis
-          console.log(`[AUTO-CREATE] Creating missing item: ${item.namaBarang}`);
-          
-          // Cari Unit yang cocok
+          // AUTO-CREATE
           const units = await tx.unit.findMany();
           const targetUnit = units.find(u => u.name.toUpperCase() === (item.satuan || "").toUpperCase()) || units[0];
-          
-          // Cari ItemType default (Barang Jadi)
           const itemTypes = await tx.itemType.findMany({ where: { category: "BARANG_JADI" } });
-          const targetType = itemTypes[0]; // Ambil yang ada saja jika tidak ada "General"
+          const targetType = itemTypes[0];
 
           const newItem = await tx.item.create({
             data: {
               code: `AUTO-${item.id.substring(0, 8).toUpperCase()}`,
               name: item.namaBarang,
               category: "BARANG_JADI",
-              unitId: targetUnit?.id || "7d4d93cb-0a2c-4f72-b537-25b4feeabbc5", // Fallback to PCS ID if needed
-              itemTypeId: targetType?.id || "51ec32b2-debc-441b-affb-f339a6bcf8a7", // Fallback to PE Bening ID
+              unitId: targetUnit?.id || "7d4d93cb-0a2c-4f72-b537-25b4feeabbc5",
+              itemTypeId: targetType?.id || "51ec32b2-debc-441b-affb-f339a6bcf8a7",
               currentStock: 0,
               isActive: true,
             }
           });
           itemId = newItem.id;
-          console.log(`[AUTO-CREATE] New Item ID: ${itemId}`);
         }
       }
 
       // 3) Update Saldo
       const newProducedQty = (item.producedQty || 0) + additionalQty;
       const newReadyQty = (item.readyQty || 0) + additionalQty;
-      
-      // Update item status jika sudah mencapai target
       const isDone = newProducedQty >= item.qty;
 
-      const updatedItem = await tx.spkItem.update({
-        where: { id: spkItemId },
-        data: {
-          producedQty: newProducedQty,
-          readyQty: newReadyQty,
-          itemId: itemId, // Sinkronisasi ID jika ditemukan
-          fulfillmentStatus: isDone ? "DONE" : item.fulfillmentStatus,
-        },
-      });
+      let updatedItem;
+      if (!isRetur) {
+        updatedItem = await tx.spkItem.update({
+          where: { id: spkItemId },
+          data: {
+            producedQty: newProducedQty,
+            readyQty: newReadyQty,
+            itemId: itemId,
+            fulfillmentStatus: isDone ? "DONE" : item.fulfillmentStatus,
+          },
+        });
+      } else {
+        updatedItem = await (tx as any).spkReturItem.update({
+          where: { id: spkItemId },
+          data: {
+            producedQty: newProducedQty,
+            readyQty: newReadyQty,
+            itemId: itemId,
+            fulfillmentStatus: isDone ? "DONE" : item.fulfillmentStatus,
+          },
+        });
+      }
 
-      // 3.1) Update Physical Stock & Record Transaction (MASUK from PRODUCTION)
+      // 3.1) Update Physical Stock & Record Transaction
       if (itemId) {
-        const memo = `Hasil produksi masuk: ${item.namaBarang} (SPK #${spkId.substring(0, 8)})`;
-        
-        // Buat record transaksi agar muncul di laporan Barang Masuk
+        const memo = `Hasil produksi masuk: ${item.namaBarang} (${isRetur ? "SPK Retur" : "SPK"} #${spkId.substring(0, 8)})`;
         const transaction = await tx.transaction.create({
           data: {
             date: new Date(),
@@ -109,48 +131,30 @@ export async function POST(
           }
         });
 
-        // Update stok fisik di Master Data
         const { updateStock } = await import("@/lib/stock");
-        await updateStock(
-          itemId,
-          additionalQty,
-          TransactionType.MASUK,
-          authUser.userId,
-          memo,
-          transaction.id,
-          tx
-        );
+        await updateStock(itemId, additionalQty, TransactionType.MASUK, authUser.userId, memo, transaction.id, tx);
       }
 
-      // 3.2) SAFETY CHECK: Jika SPK masih QUEUE, pindahkan ke IN_PROGRESS
-      const spk = await tx.spk.findUnique({
-        where: { id: spkId },
-        include: { spkItems: true }
-      });
-
-      if (spk && spk.status === SpkStatus.QUEUE) {
-        console.log(`[SAFETY] Moving SPK #${spk.spkNumber} to IN_PROGRESS upon progress report`);
-        const updatedSpk = await tx.spk.update({
-          where: { id: spk.id },
-          data: { 
-            status: SpkStatus.IN_PROGRESS,
-            inventoryApproved: true,
-            inventoryApprovedAt: new Date(),
-          },
-          include: { spkItems: true }
+      // 3.2) SAFETY CHECK: Move to IN_PROGRESS
+      if (!isRetur) {
+        const spk = await tx.spk.findUnique({
+          where: { id: spkId },
         });
-
-        // Pastikan item stok juga ikut siap
-        for (const sItem of updatedSpk.spkItems) {
-          if (sItem.fulfillmentMethod === FulfillmentMethod.FROM_STOCK && sItem.readyQty === 0) {
-            await tx.spkItem.update({
-              where: { id: sItem.id },
-              data: { 
-                readyQty: sItem.qty,
-                fulfillmentStatus: FulfillmentStatus.RESERVED 
-              },
-            });
-          }
+        if (spk && spk.status === SpkStatus.QUEUE) {
+          await tx.spk.update({
+            where: { id: spk.id },
+            data: { status: SpkStatus.IN_PROGRESS, inventoryApproved: true, inventoryApprovedAt: new Date() },
+          });
+        }
+      } else {
+        const spkRetur = await (tx as any).spkRetur.findUnique({
+          where: { id: spkId },
+        });
+        if (spkRetur && spkRetur.status === "QUEUE") {
+          await (tx as any).spkRetur.update({
+            where: { id: spkRetur.id },
+            data: { status: "IN_PROGRESS" },
+          });
         }
       }
 
@@ -159,11 +163,14 @@ export async function POST(
 
     // 4) Notifikasi ke Gudang bahwa ada barang baru yang siap kirim
     try {
+      const isComplete = result.fulfillmentStatus === "DONE";
       await prisma.notification.create({
         data: {
-          title: "Hasil Produksi Masuk",
-          message: `${additionalQty} unit ${result.namaBarang} baru saja selesai dan siap dikirim.`,
-          type: "INFO",
+          title: isComplete ? "Produksi Selesai" : "Hasil Produksi Masuk",
+          message: isComplete 
+            ? `Produksi ${result.namaBarang} (SPK #${result.spkId.substring(0, 8)}) telah selesai. Siap di-approve!`
+            : `${additionalQty} unit ${result.namaBarang} baru saja selesai dan siap dikirim.`,
+          type: isComplete ? "SUCCESS" : "INFO",
           targetUrl: "/approval-barang-jadi",
         },
       });

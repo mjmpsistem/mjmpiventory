@@ -9,104 +9,108 @@ export async function GET(request: NextRequest) {
 
     // Ambil SPK yang siap dikirim (READY_TO_SHIP, PARTIAL, atau IN_PROGRESS dengan readyQty > 0)
     // SPK yang statusnya READY_TO_SHIP, PARTIAL, IN_PROGRESS dan SHIPPED (jika masih ada yang siap kirim)
-    const spks: any[] = await prisma.spk.findMany({
-      where: {
-        OR: [
-          { warehouseApproved: true },
-          { status: { in: [SpkStatus.SHIPPING, SpkStatus.DONE] } }
-        ],
-        status: {
-          in: [SpkStatus.READY_TO_SHIP, SpkStatus.PARTIAL, SpkStatus.SHIPPING, SpkStatus.DONE],
+    const [spks, spkReturs]: [any[], any[]] = await Promise.all([
+      prisma.spk.findMany({
+        where: {
+          OR: [
+            { warehouseApproved: true },
+            { status: { in: [SpkStatus.SHIPPING, SpkStatus.DONE, SpkStatus.PARTIAL] } }
+          ],
+          status: {
+            in: [SpkStatus.READY_TO_SHIP, SpkStatus.PARTIAL, SpkStatus.SHIPPING, SpkStatus.DONE],
+          },
+        } as any,
+        include: {
+          lead: true,
+          soHeader: { include: { items: true } },
+          spkItems: { include: { salesOrder: true } },
+          shipping: { include: { driver: { select: { name: true } }, shipping_item: true } },
+          invoices: { include: { payments: true } },
+          payments: true
         },
-      } as any,
-      include: {
-        lead: true,
-        soHeader: {
-          include: {
-            items: true
-          }
+        orderBy: { updatedAt: "desc" },
+      }),
+      (prisma as any).spkRetur.findMany({
+        where: {
+          status: { in: ["READY_TO_SHIP", "PARTIAL", "SHIPPING", "DONE"] },
         },
-        spkItems: {
-          include: {
-            salesOrder: true
-          }
+        include: {
+          parentSpk: {
+            include: { lead: true, soHeader: { include: { items: true } }, user: true }
+          },
+          returnItems: { include: { originalSpkItem: { include: { salesOrder: true } } } },
+          productionRequest: true
         },
-        shipping: {
-          include: {
-            driver: {
-              select: {
-                name: true
-              }
-            },
-            shipping_item: true
-          }
-        },
-        invoices: {
-          include: {
-            payments: true
-          }
-        },
-        payments: true
-      },
-      orderBy: { updatedAt: "desc" },
-    });
+        orderBy: { updatedAt: "desc" },
+      })
+    ]);
 
-    // Formatting data untuk frontend dengan informasi Transit
-    const result = await Promise.all(spks.map(async (spk) => {
-      const spkItemsFormatted = await Promise.all(spk.spkItems.map(async (item: any) => {
-        // Hitung kuantitas yang sedang di jalan (transit)
+    // Formatting data untuk frontend
+    const formatSpk = async (item: any, isRetur: boolean) => {
+      const items = isRetur ? item.returnItems : item.spkItems;
+      const lead = isRetur ? item.parentSpk.lead : item.lead;
+      const soHeader = isRetur ? item.parentSpk.soHeader : item.soHeader;
+
+      const itemsFormatted = await Promise.all(items.map(async (i: any) => {
         const transitItems = await prisma.shipping_item.findMany({
           where: {
-            spkItemId: item.id,
-            shipping: {
-              waktuSampai: null // Belum sampai
-            }
+            [isRetur ? "spkReturItemId" : "spkItemId"]: i.id,
+            shipping: { waktuSampai: null }
           },
           select: { qty: true }
         });
         const onTruckQty = transitItems.reduce((sum: number, si: any) => sum + si.qty, 0);
 
         return {
-          id: item.id,
-          namaBarang: item.namaBarang,
-          qty: item.qty,
-          readyQty: item.readyQty,
-          producedQty: item.producedQty,
-          shippedQty: item.shippedQty,
-          approvedQty: item.approvedQty,
+          id: i.id,
+          namaBarang: i.namaBarang,
+          qty: i.qty,
+          readyQty: i.readyQty,
+          producedQty: i.producedQty,
+          shippedQty: i.shippedQty,
+          approvedQty: i.approvedQty,
           onTruckQty,
-          satuan: item.satuan,
-          fulfillmentMethod: item.fulfillmentMethod,
-          fulfillmentStatus: item.fulfillmentStatus,
-          salesOrder: item.salesOrder ? {
-            kode_barang: item.salesOrder.kode_barang,
-            ukuran_barang: item.salesOrder.ukuran_barang,
-            warna_barang: item.salesOrder.warna_barang,
-            ketebalan_barang: item.salesOrder.ketebalan_barang,
-            quantity: item.salesOrder.quantity,
-            satuan: item.salesOrder.satuan,
-            pcs_per_pack: item.salesOrder.pcs_per_pack,
-            spesifikasi_tambahan: item.salesOrder.spesifikasi_tambahan,
-            catatan: item.salesOrder.catatan,
-            harga_satuan: item.salesOrder.harga_satuan
+          satuan: i.satuan,
+          fulfillmentMethod: i.fulfillmentMethod,
+          fulfillmentStatus: i.fulfillmentStatus,
+          salesOrder: i.salesOrder || i.originalSpkItem?.salesOrder ? {
+            ...(i.salesOrder || i.originalSpkItem?.salesOrder),
+            nama_barang: i.namaBarang
           } : null
         };
       }));
 
+      let shipping = item.shipping;
+      if (isRetur && !shipping) {
+        // Find latest shipping via return items
+        const latestSItem = await prisma.shipping_item.findFirst({
+          where: { spkReturItemId: { in: items.map((i: any) => i.id) } },
+          include: { shipping: { include: { driver: { select: { name: true } } } } },
+          orderBy: { shipping: { tglKirim: "desc" } }
+        });
+        if (latestSItem) shipping = latestSItem.shipping;
+      }
+
       return {
-        id: spk.id,
-        spkNumber: spk.spkNumber,
-        status: spk.status,
-        updatedAt: spk.updatedAt.toISOString(),
-        lead: spk.lead,
-        soHeader: spk.soHeader,
-        shippingId: spk.shippingId,
-        shipping: spk.shipping,
-        spkItems: spkItemsFormatted,
-        invoices: spk.invoices,
-        payments: spk.payments
+        id: item.id,
+        isRetur,
+        spkNumber: item.spkNumber,
+        status: item.status,
+        updatedAt: item.updatedAt.toISOString(),
+        lead,
+        soHeader,
+        shippingId: shipping?.id || item.shippingId,
+        shipping,
+        spkItems: itemsFormatted,
+        invoices: item.invoices || [],
+        payments: item.payments || []
       };
-    }));
+    };
+
+    const result = await Promise.all([
+      ...spks.map(s => formatSpk(s, false)),
+      ...spkReturs.map(sr => formatSpk(sr, true))
+    ]);
 
     return NextResponse.json(result);
   } catch (error) {
@@ -139,42 +143,69 @@ export async function POST(request: NextRequest) {
 
       // 2. Link SPKs to Shipping & Process Items
       for (const spkId of spkIds) {
-        await tx.spk.update({
-          where: { id: spkId },
-          data: { 
-            shippingId: newShipping.id,
-            status: "SHIPPING"
-          },
-        });
+        const isSpk = await tx.spk.findUnique({ where: { id: spkId } });
+        if (isSpk) {
+          await tx.spk.update({
+            where: { id: spkId },
+            data: { shippingId: newShipping.id, status: "SHIPPING" },
+          });
+        } else {
+          await (tx as any).spkRetur.update({
+            where: { id: spkId },
+            data: { status: "SHIPPING" },
+          });
+          // SpkRetur might not have a direct shippingId for simplicity or we can add it later if needed
+        }
       }
 
       // 3. Create Shipping Items
       for (const item of items) {
+        const isReturItem = item.isRetur;
         await tx.shipping_item.create({
           data: {
             id: crypto.randomUUID(),
             shippingId: newShipping.id,
-            spkItemId: item.spkItemId,
+            spkItemId: !isReturItem ? item.spkItemId : null,
+            spkReturItemId: isReturItem ? item.spkItemId : null,
             qty: item.qty,
           },
         });
 
-        // Di alur Dua-Tahap:
-        // 1. readyQty dikurangi SAAT INI (Departure) agar stok fisik di gudang akurat.
-        // 2. shippedQty bertambah nanti saat konfirmasi kedatangan (PATCH).
-        
-        const spkItem = await tx.spkItem.findUnique({ where: { id: item.spkItemId } });
-        if (spkItem) {
-          const newReadyQty = Math.max(0, (spkItem.readyQty || 0) - item.qty);
-          await tx.spkItem.update({
-            where: { id: spkItem.id },
-            data: { readyQty: newReadyQty }
-          });
+        if (!isReturItem) {
+          const spkItem = await tx.spkItem.findUnique({ where: { id: item.spkItemId } });
+          if (spkItem) {
+            await tx.spkItem.update({
+              where: { id: spkItem.id },
+              data: { readyQty: Math.max(0, (spkItem.readyQty || 0) - item.qty) }
+            });
+          }
+        } else {
+          const returItem = await (tx as any).spkReturItem.findUnique({ where: { id: item.spkItemId } });
+          if (returItem) {
+            await (tx as any).spkReturItem.update({
+              where: { id: returItem.id },
+              data: { readyQty: Math.max(0, (returItem.readyQty || 0) - item.qty) }
+            });
+          }
         }
       }
 
       return newShipping;
     });
+
+    // ✅ NOTIFIKASI PENGIRIMAN
+    try {
+      await prisma.notification.create({
+        data: {
+          title: "Pengiriman Dimulai",
+          message: `Pengiriman baru telah diberangkatkan untuk ${spkIds.length} SPK.`,
+          type: "INFO",
+          targetUrl: "/shipping",
+        },
+      });
+    } catch (e) {
+      console.error("Failed to notify shipping", e);
+    }
 
     return NextResponse.json(shipping);
   } catch (error: any) {
@@ -209,7 +240,8 @@ export async function PATCH(request: NextRequest) {
           },
           shipping_item: {
             include: {
-              spk_item: true
+              spk_item: { include: { spk: { include: { lead: true } } } },
+              spk_retur_item: { include: { spkRetur: { include: { parentSpk: { include: { lead: true } } } } } }
             }
           }
         }
@@ -221,99 +253,141 @@ export async function PATCH(request: NextRequest) {
       const { fulfillReservedStock, updateStock } = await import("@/lib/stock");
       
       for (const sItem of ship.shipping_item) {
-        const spkItem = sItem.spk_item;
-        const qty = sItem.qty;
-        
-        // Cari SPK terkait untuk informasi transaksi
-        const relatedSpk = ship.spks.find(s => s.id === spkItem.spkId);
-        const destination = relatedSpk?.lead?.nama_toko || "Customer";
-        const memo = `Pengiriman Selesai SPK ${relatedSpk?.spkNumber} - ${spkItem.namaBarang} (Penerima: ${penerimaNama})`;
+        const isRetur = !!sItem.spkReturItemId;
+        const targetItem = isRetur ? sItem.spk_retur_item : sItem.spk_item;
+        if (!targetItem) continue;
 
-        // Pastikan itemId ada
-        if (spkItem.itemId) {
-           // 1. Buat Record Transaksi Terlebih Dahulu
+        const qty = sItem.qty;
+        const spkNumber = isRetur ? (targetItem as any).spkRetur.spkNumber : (targetItem as any).spk.spkNumber;
+        const lead = isRetur ? (targetItem as any).spkRetur.parentSpk.lead : (targetItem as any).spk.lead;
+        const destination = lead?.nama_toko || "Customer";
+        const memo = `Pengiriman Selesai ${isRetur ? "Retur" : "SPK"} ${spkNumber} - ${targetItem.namaBarang} (Penerima: ${penerimaNama})`;
+
+        if (targetItem.itemId) {
            const transaction = await tx.transaction.create({
              data: {
                date: new Date(),
                type: "KELUAR",
-               source: spkItem.fulfillmentMethod === "PRODUCTION" ? "PRODUKSI" : "ORDER_CUSTOMER",
-               itemId: spkItem.itemId,
+               source: targetItem.fulfillmentMethod === "PRODUCTION" ? "PRODUKSI" : "ORDER_CUSTOMER",
+               itemId: targetItem.itemId,
                quantity: qty,
                destination,
-               spkNumber: relatedSpk?.spkNumber,
+               spkNumber,
                memo,
                userId: authUser.userId,
              }
            });
 
-           // 2. Potong Stok dengan Safety Check (Mencegah Crash jika ReadyQty Ter-inflasi/Bug)
            const itemMaster = await tx.item.findUnique({ 
-             where: { id: spkItem.itemId },
+             where: { id: targetItem.itemId },
              select: { currentStock: true, reservedStock: true } 
            });
            
            let effectiveQty = qty;
            if (itemMaster) {
-             // Cap by physical stock
              effectiveQty = Math.min(effectiveQty, itemMaster.currentStock);
-             // Cap by reserved stock if method is FROM_STOCK
-             if (spkItem.fulfillmentMethod === "FROM_STOCK") {
+             if (targetItem.fulfillmentMethod === "FROM_STOCK") {
                effectiveQty = Math.min(effectiveQty, itemMaster.reservedStock);
              }
            }
 
            if (effectiveQty > 0) {
-             if (spkItem.fulfillmentMethod === "FROM_STOCK") {
-               await fulfillReservedStock(spkItem.itemId, effectiveQty, authUser.userId, memo, transaction.id, tx);
+             if (targetItem.fulfillmentMethod === "FROM_STOCK") {
+               await fulfillReservedStock(targetItem.itemId, effectiveQty, authUser.userId, memo, transaction.id, tx);
              } else {
-               await updateStock(spkItem.itemId, effectiveQty, "KELUAR" as any, authUser.userId, memo, transaction.id, tx);
+               await updateStock(targetItem.itemId, effectiveQty, "KELUAR" as any, authUser.userId, memo, transaction.id, tx);
              }
-           } else if (qty > 0) {
-             console.warn(`[STOCK-SAFETY] Skipping stock deduction for ${spkItem.namaBarang} because current stock is 0 or already deducted.`);
            }
         }
 
-        // 3. Update spkItem: shippedQty & fulfillmentStatus
-        // Recalculate total shipped quantity from all finished shipments for this SpkItem
         const finishedShippingItems = await tx.shipping_item.findMany({
           where: {
-            spkItemId: spkItem.id,
-            shipping: {
-              waktuSampai: { not: null }
-            }
+            [isRetur ? "spkReturItemId" : "spkItemId"]: targetItem.id,
+            shipping: { waktuSampai: { not: null } }
           },
           select: { qty: true }
         });
         
         const newShippedQty = finishedShippingItems.reduce((sum, item) => sum + item.qty, 0);
-        // readyQty SUDAH dikurangi saat POST (Departure). Di sini kita hanya mencatat barang sudah sampai.
         
-        await tx.spkItem.update({
-          where: { id: spkItem.id },
-          data: {
-            shippedQty: newShippedQty,
-            fulfillmentStatus: newShippedQty >= spkItem.qty ? FulfillmentStatus.FULFILLED : spkItem.fulfillmentStatus
+        if (!isRetur) {
+          // Hitung kumulatif terkirim: Induk + semua Retur-nya
+          const returShipped = await tx.shipping_item.aggregate({
+            _sum: { qty: true },
+            where: { 
+              spkReturItemId: { not: null },
+              spk_retur_item: { originalSpkItemId: targetItem.id },
+              shipping: { waktuSampai: { not: null } }
+            }
+          });
+          const cumulativeShipped = newShippedQty + (returShipped._sum.qty || 0);
+
+          await tx.spkItem.update({
+            where: { id: targetItem.id },
+            data: {
+              shippedQty: newShippedQty,
+              fulfillmentStatus: cumulativeShipped >= targetItem.qty ? FulfillmentStatus.FULFILLED : targetItem.fulfillmentStatus
+            }
+          });
+        } else {
+          await (tx as any).spkReturItem.update({
+            where: { id: targetItem.id },
+            data: {
+              shippedQty: newShippedQty,
+              fulfillmentStatus: newShippedQty >= targetItem.qty ? "FULFILLED" : targetItem.fulfillmentStatus
+            }
+          });
+        }
+      }
+
+      // Update semua SPK/Retur terkait menjadi DONE jika semua item sudah terkirim
+      // Collect unique SPK IDs and Retur IDs from ship.shipping_item
+      const spkIdsToUpdate = new Set<string>();
+      const returIdsToUpdate = new Set<string>();
+
+      for (const sItem of ship.shipping_item) {
+        if (sItem.spkItemId) {
+          const item = await tx.spkItem.findUnique({ where: { id: sItem.spkItemId }, select: { spkId: true } });
+          if (item) spkIdsToUpdate.add(item.spkId);
+        } else if (sItem.spkReturItemId) {
+          const item = await (tx as any).spkReturItem.findUnique({ 
+            where: { id: sItem.spkReturItemId }, 
+            select: { spkRetur: { select: { id: true, parentSpkId: true } } } 
+          });
+          if (item?.spkRetur) {
+            returIdsToUpdate.add(item.spkRetur.id);
+            spkIdsToUpdate.add(item.spkRetur.parentSpkId); // Re-check parent!
           }
+        }
+      }
+
+      for (const id of spkIdsToUpdate) {
+        const freshItems = await tx.spkItem.findMany({ where: { spkId: id } });
+        
+        // Cek kumulatif: Gabungkan shippedQty dari SPK Induk + ShippedQty di semua SpkRetur yang merujuk ke item ini
+        const allShipped = await Promise.all(freshItems.map(async (item) => {
+          const returShipped = await (tx as any).spkReturItem.aggregate({
+            _sum: { shippedQty: true },
+            where: { originalSpkItemId: item.id }
+          });
+          const totalShipped = (item.shippedQty || 0) + (returShipped._sum.shippedQty || 0);
+          return totalShipped >= item.qty;
+        }));
+
+        const isFullyDone = allShipped.every(res => res === true);
+        await tx.spk.update({
+          where: { id },
+          data: { status: isFullyDone ? SpkStatus.DONE : SpkStatus.PARTIAL }
         });
       }
 
-      // Update semua SPK terkait menjadi DONE jika semua item sudah terkirim
-      for (const spk of ship.spks) {
-        // Re-fetch spkItems after updates above
-        const freshItems = await tx.spkItem.findMany({ where: { spkId: spk.id } });
-        const allShipped = freshItems.every(item => (item.shippedQty || 0) >= item.qty);
-        
-        if (allShipped) {
-          await tx.spk.update({
-            where: { id: spk.id },
-            data: { status: SpkStatus.DONE }
-          });
-        } else {
-             await tx.spk.update({
-                where: { id: spk.id },
-                data: { status: SpkStatus.PARTIAL }
-              });
-        }
+      for (const id of returIdsToUpdate) {
+        const freshItems = await (tx as any).spkReturItem.findMany({ where: { spkReturId: id } });
+        const allShipped = freshItems.every((item: any) => (item.shippedQty || 0) >= item.qty);
+        await (tx as any).spkRetur.update({
+          where: { id },
+          data: { status: allShipped ? "DONE" : "PARTIAL" }
+        });
       }
 
       return ship;
