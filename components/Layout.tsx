@@ -81,7 +81,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     audioUnlocked, 
     audioBlocked, 
     unlockAudio, 
-    markAsRead 
+    markAsRead,
+    logout
   } = useNotifications();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -300,10 +301,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [pathname]);
 
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-  };
 
   const toggleMenu = (href: string) => {
     if (expandedMenus.includes(href)) {
@@ -492,7 +489,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       </p>
                     </div>
                     <button
-                      onClick={handleLogout}
+                      onClick={logout}
                       className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors rounded-b-lg"
                     >
                       <LogOut size={16} />
@@ -953,7 +950,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         </div>
 
                         <button
-                          onClick={handleLogout}
+                          onClick={logout}
                           className="
                   w-full flex items-center gap-3
                   px-4 py-3 text-sm

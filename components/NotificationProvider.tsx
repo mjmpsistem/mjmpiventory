@@ -49,6 +49,8 @@ interface NotificationContextType {
   playNotificationSound: () => void;
   fetchCounts: () => Promise<void>;
   fetchNotifications: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  logout: () => Promise<void>;
   markAsRead: (id?: string, all?: boolean) => Promise<void>;
 }
 
@@ -161,20 +163,66 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   };
 
+  const fetchUser = async () => {
+    try {
+      const res = await fetch("/api/auth/me");
+      if (res.status === 401) {
+        setUser(null);
+        sessionStorage.removeItem("authUser");
+        return;
+      }
+      const data = await res.json();
+      if (data.user) {
+        setUser(data.user);
+        sessionStorage.setItem("authUser", JSON.stringify(data.user));
+      } else {
+        setUser(null);
+        sessionStorage.removeItem("authUser");
+      }
+    } catch (err) {
+      console.error("Auth fetch failed", err);
+      setUser(null);
+    }
+  };
+
+  const refreshUser = async () => {
+    await fetchUser();
+    await fetchCounts();
+    await fetchNotifications();
+  };
+
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      setUser(null);
+      setNotifications([]);
+      setCounts({
+        purchaseOrder: 0,
+        productionRequest: 0,
+        productionApprovalNormal: 0,
+        productionApprovalRetur: 0,
+        gudangApproval: 0,
+        waste: 0,
+        poPending: 0,
+        tradingNeeded: 0,
+        shippingReady: 0,
+        productionRetur: 0,
+        gudangRetur: 0,
+        shippingRetur: 0,
+        shippingTransit: 0,
+        shippingReturTransit: 0,
+      });
+      sessionStorage.removeItem("authUser");
+      router.push("/login");
+    } catch (err) {
+      console.error("Logout failed", err);
+      // Fallback redirect
+      window.location.href = "/login";
+    }
+  };
+
   // Auth Effect
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await fetch("/api/auth/me");
-        const data = await res.json();
-        if (data.user) {
-          setUser(data.user);
-          sessionStorage.setItem("authUser", JSON.stringify(data.user));
-        }
-      } catch (err) {
-        console.error("Auth fetch failed", err);
-      }
-    };
     fetchUser();
   }, []);
 
@@ -284,6 +332,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         playNotificationSound,
         fetchCounts,
         fetchNotifications,
+        refreshUser,
+        logout,
         markAsRead,
       }}
     >

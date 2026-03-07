@@ -42,7 +42,9 @@ export default function LoginPage() {
 
       if (res.ok) {
         setIsExiting(true);
-        setTimeout(() => router.push("/dashboard"), 700);
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 700);
       } else {
         const data = await res.json();
         setError(data.error || "Login gagal");
