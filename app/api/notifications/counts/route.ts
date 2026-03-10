@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { SpkStatus, FulfillmentMethod, FulfillmentStatus } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     // 1. Fetch data for complex logic

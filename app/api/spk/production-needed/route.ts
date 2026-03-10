@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const [rawSpks, spkReturs] = await Promise.all([
       prisma.spk.findMany({
         where: {
-          status: { in: [SpkStatus.IN_PROGRESS, SpkStatus.PARTIAL] },
+          status: { in: [SpkStatus.QUEUE, SpkStatus.IN_PROGRESS, SpkStatus.PARTIAL] },
           spkItems: {
             some: {
               fulfillmentMethod: FulfillmentMethod.PRODUCTION,
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
       }),
       (prisma as any).spkRetur.findMany({
         where: {
-          status: { in: ["QUEUE", "IN_PROGRESS"] },
+          status: { in: ["QUEUE", "IN_PROGRESS", "PARTIAL"] },
           returnItems: {
             some: { fulfillmentMethod: "PRODUCTION", productionRequestId: null },
           },

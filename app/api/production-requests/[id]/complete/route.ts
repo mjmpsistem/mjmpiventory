@@ -17,7 +17,7 @@ export async function POST(
       );
     }
 
-    await requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY]);
+    const authUser = await requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY]);
 
     const productionRequest = await prisma.productionRequest.findUnique({
       where: { id },
@@ -37,12 +37,42 @@ export async function POST(
       );
     }
 
-    const updated = await prisma.productionRequest.update({
-      where: { id },
-      data: {
-        status: ProductionRequestStatus.COMPLETED,
-        updatedAt: new Date(),
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const res = await tx.productionRequest.update({
+        where: { id },
+        data: {
+          status: ProductionRequestStatus.COMPLETED,
+          updatedAt: new Date(),
+        },
+      });
+
+      // If it's a Manual PR (has targetItemId), add to general stock
+      const manualRes = res as any;
+      if (manualRes.targetItemId && (manualRes.targetQuantity || 0) > 0) {
+        const item = await tx.item.findUnique({ 
+          where: { id: manualRes.targetItemId },
+          include: { unit: true }
+        });
+        
+        const memo = `Hasil produksi manual selesai: ${item?.name || manualRes.productName} (${manualRes.targetQuantity} ${item?.unit.name || ''})`;
+        
+        const transaction = await tx.transaction.create({
+          data: {
+            date: new Date(),
+            type: "MASUK",
+            source: "PRODUKSI",
+            itemId: manualRes.targetItemId,
+            quantity: manualRes.targetQuantity || 0,
+            memo: memo,
+            userId: authUser.userId,
+          }
+        });
+
+        const { updateStock } = await import("@/lib/stock");
+        await updateStock(manualRes.targetItemId, manualRes.targetQuantity || 0, "MASUK" as any, authUser.userId, memo, transaction.id, tx);
+      }
+
+      return res;
     });
 
     return NextResponse.json({ productionRequest: updated });

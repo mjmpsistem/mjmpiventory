@@ -73,18 +73,38 @@ export async function POST(
         where: { id },
       });
 
-      // 5️⃣ Kembalikan SPK ke QUEUE
-      if (spk && spk.status !== SpkStatus.QUEUE) {
+      // 5️⃣ Kembalikan SPK ke QUEUE dan RESET items
+      if (spk) {
         await tx.spk.update({
           where: { id: spk.id },
           data: { status: SpkStatus.QUEUE },
         });
+
+        // Reset semua item yang tadinya terikat ke PR ini
+        await tx.spkItem.updateMany({
+          where: { productionRequestId: id },
+          data: {
+            productionRequestId: null,
+            fulfillmentStatus: "PENDING",
+            itemStatus: "QUEUE"
+          }
+        });
       }
 
-      if (spkRetur && spkRetur.status !== "QUEUE") {
+      if (spkRetur) {
         await (tx as any).spkRetur.update({
           where: { id: spkRetur.id },
           data: { status: "QUEUE" },
+        });
+
+        // Reset semua item retur yang tadinya terikat ke PR ini
+        await (tx as any).spkReturItem.updateMany({
+          where: { productionRequestId: id },
+          data: {
+            productionRequestId: null,
+            fulfillmentStatus: "PENDING",
+            itemStatus: "QUEUE"
+          }
         });
       }
     });

@@ -118,7 +118,9 @@ export async function POST(
           }
         }
 
-        if (currentItemId && (itemInDb.fulfillmentMethod === FulfillmentMethod.PRODUCTION || itemInDb.fulfillmentMethod === FulfillmentMethod.TRADING)) {
+        // Safety Stock adjustment removed for PRODUCTION as per user request
+        // Production results stay in virtual 'readyQty' for the specific SPK
+        if (currentItemId && itemInDb.fulfillmentMethod === FulfillmentMethod.TRADING) {
           const itemMaster = await tx.item.findUnique({ where: { id: currentItemId }, select: { currentStock: true } });
           if (itemMaster && itemMaster.currentStock < shipQty) {
             const diff = shipQty - itemMaster.currentStock;
@@ -127,7 +129,7 @@ export async function POST(
               data: {
                 date: new Date(),
                 type: TransactionType.MASUK,
-                source: itemInDb.fulfillmentMethod === FulfillmentMethod.PRODUCTION ? TransactionSource.PRODUKSI : TransactionSource.TRADING,
+                source: TransactionSource.TRADING,
                 itemId: currentItemId,
                 quantity: diff,
                 memo: fillMemo,

@@ -128,11 +128,11 @@ export async function POST(request: NextRequest) {
     requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY]);
 
     const body = await request.json();
-    const { spkNumber, productName, items, memo } = body;
+    const { spkNumber, productName, items, memo, targetItemId, targetQuantity } = body;
     const authUser = requireAuth(request, [UserRole.SUPERADMIN, UserRole.FOUNDER, UserRole.KEPALA_INVENTORY]);
 
     if (
-      !spkNumber ||
+      (!spkNumber && !targetItemId) ||
       !productName ||
       !items ||
       !Array.isArray(items) ||
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate stock availability (gunakan availableStock untuk konsistensi)
+    // Validate stock availability
     for (const item of items) {
       const dbItem = await prisma.item.findUnique({
         where: { id: item.itemId },
@@ -157,7 +157,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Di model baru: currentStock SUDAH stok fisik yang bersih (belum di-reserve)
       const availableStock = dbItem.currentStock;
       if (availableStock < item.quantity) {
         return NextResponse.json(
@@ -169,18 +168,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Determine if it's a regular SPK or SPK Retur
-    const spk = await prisma.spk.findUnique({ where: { spkNumber } });
-    const spkRetur = await prisma.spkRetur.findUnique({ where: { spkNumber } });
+    // Determine if it's a regular SPK or SPK Retur (if spkNumber is provided)
+    let spk = null;
+    let spkRetur = null;
+    if (spkNumber) {
+      spk = await prisma.spk.findUnique({ where: { spkNumber } });
+      spkRetur = await prisma.spkRetur.findUnique({ where: { spkNumber } });
 
-    if (!spk && !spkRetur) {
-      return NextResponse.json(
-        { error: `Nomor SPK ${spkNumber} tidak ditemukan` },
-        { status: 400 },
-      );
+      if (!spk && !spkRetur) {
+        return NextResponse.json(
+          { error: `Nomor SPK ${spkNumber} tidak ditemukan` },
+          { status: 400 },
+        );
+      }
     }
 
-    // Create production request dan link ke SpkItem / SpkReturItem
+    // Create production request
     const productionRequest = await prisma.$transaction(async (tx) => {
       // Create production request
       const newRequest = await tx.productionRequest.create({
@@ -191,6 +194,8 @@ export async function POST(request: NextRequest) {
           memo,
           userId: authUser.userId,
           status: ProductionRequestStatus.PENDING,
+          targetItemId: targetItemId || null,
+          targetQuantity: targetQuantity || 0,
           items: {
             create: items.map((item: any) => ({
               itemId: item.itemId,
@@ -206,6 +211,9 @@ export async function POST(request: NextRequest) {
               username: true,
             },
           },
+          targetItem: {
+            include: { unit: true }
+          },
           items: {
             include: {
               item: {
@@ -220,7 +228,6 @@ export async function POST(request: NextRequest) {
       });
 
       if (spk) {
-        // Update semua SpkItem dengan fulfillmentMethod = PRODUCTION yang belum punya productionRequestId
         await tx.spkItem.updateMany({
           where: {
             spkId: spk.id,
@@ -232,7 +239,6 @@ export async function POST(request: NextRequest) {
           },
         });
       } else if (spkRetur) {
-        // Update semua SpkReturItem dengan fulfillmentMethod = PRODUCTION yang belum punya productionRequestId
         await tx.spkReturItem.updateMany({
           where: {
             spkReturId: spkRetur.id,
@@ -250,16 +256,15 @@ export async function POST(request: NextRequest) {
 
     // ✅ CREATE NOTIFICATION
     try {
-      console.log(`[NOTIFICATION_LOG] Creating notification for Production Request: SPK #${spkNumber}`);
+      const identifier = spkNumber ? `SPK #${spkNumber}` : "Manual";
       const prNotification = await prisma.notification.create({
         data: {
           title: "Permintaan Produksi Baru",
-          message: `SPK #${spkNumber} - ${productName}`,
+          message: `${identifier} - ${productName}`,
           type: "INFO",
           targetUrl: "/permintaan-produksi",
         },
       });
-      console.log(`[NOTIFICATION_LOG] Notification created successfully with ID: ${prNotification.id}`);
     } catch (notifyError: any) {
       console.error("[NOTIFICATION_LOG] Failed to create notification for PR:", notifyError.message || notifyError);
     }

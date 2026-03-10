@@ -22,26 +22,26 @@ model LoginActivity {
 }
 
 model User {
-  id                    String                 @id @default(uuid()) @db.Uuid
-  username              String                 @unique
-  email                 String?                @unique
-  password              String
-  name                  String
-  role                  String
-  jabatan               String?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  dailyProductionLogs   DailyProductionLog[]
-  invoices              Invoice[]
-  loginActivities       LoginActivity[]
-  payments              PaymentHistory[]
-  productionRequests    ProductionRequest[]
-  purchaseOrders        PurchaseOrder[]
+  id                  String               @id @default(uuid()) @db.Uuid
+  username            String               @unique
+  email               String?              @unique
+  password            String
+  name                String
+  role                String
+  jabatan             String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  dailyProductionLogs DailyProductionLog[]
+  invoices            Invoice[]
+  loginActivities     LoginActivity[]
+  payments            PaymentHistory[]
+  productionRequests  ProductionRequest[]
+  purchaseOrders      PurchaseOrder[]
   purchaseOrderPayments PurchaseOrderPayment[]
-  shippings             Shipping[]             @relation("DriverToShipping")
-  spks                  Spk[]
-  stockHistories        StockHistory[]
-  transactions          Transaction[]
+  shippings           Shipping[]           @relation("DriverToShipping")
+  spks                Spk[]
+  stockHistories      StockHistory[]
+  transactions        Transaction[]
 
   @@map("user")
 }
@@ -56,10 +56,10 @@ model Lead {
   alamat_gmaps   String?
   no_telp        String
   email          String?
+  kota           String?
   is_delimited   Boolean            @default(false)
   created_at     DateTime           @default(now())
   updated_at     DateTime           @updatedAt
-  kota           String?
   invoices       Invoice[]
   payments       PaymentHistory[]
   so_headers     SalesOrderHeader[]
@@ -129,22 +129,22 @@ model Spk {
   inventoryApproved   Boolean            @default(false)
   inventoryApprovedAt DateTime?
   inventoryUserId     String?            @db.Uuid
-  soHeaderId          Int?               @unique
-  shippingId          String?            @db.Uuid
   warehouseApproved   Boolean            @default(false)
   warehouseApprovedAt DateTime?
+  soHeaderId          Int?               @unique
+  shippingId          String?            @db.Uuid
   invoices            Invoice[]
   payments            PaymentHistory[]
   productionRequest   ProductionRequest?
   purchaseOrders      PurchaseOrder[]
   lead                Lead               @relation(fields: [leadId], references: [id])
-  shipping            Shipping?          @relation(fields: [shippingId], references: [id])
   soHeader            SalesOrderHeader?  @relation(fields: [soHeaderId], references: [id])
   user                User               @relation(fields: [userId], references: [id])
+  shipping            Shipping?          @relation(fields: [shippingId], references: [id])
   spkItems            SpkItem[]
   materialUsages      SpkMaterialUsage[]
-  spkReturs           SpkRetur[]
   wasteStocks         WasteStock[]       @relation("SpkToWaste")
+  spkReturs           SpkRetur[]
 
   @@index([status])
   @@index([spkNumber])
@@ -152,36 +152,35 @@ model Spk {
 }
 
 model SpkItem {
-  id                   String            @id @default(uuid()) @db.Uuid
-  spkId                String            @db.Uuid
-  salesOrderId         Int?
-  namaBarang           String
-  qty                  Float
-  satuan               String
-  fulfillmentMethod    String            @default("FROM_STOCK")
-  productionRequestId  String?           @db.Uuid
-  createdAt            DateTime          @default(now())
-  fulfillmentStatus    String            @default("PENDING")
-  itemId               String?           @db.Uuid
-  updatedAt            DateTime          @updatedAt
-  invoicedQty          Float             @default(0)
-  itemStatus           String            @default("QUEUE")
-  producedQty          Float             @default(0)
-  shippedQty           Float             @default(0)
-  readyQty             Float             @default(0)
-  overproductionChoice String?
-  approvedQty          Float             @default(0)
-  productionStatus     String?
-  recycledQty          Float             @default(0)
-  invoiceItems         InvoiceItem[]
-  returns              ProductReturn[]
-  shipping_item        shipping_item[]
-  item                 Item?             @relation("ItemToSpkItem", fields: [itemId], references: [id])
-  salesOrder           SalesOrder?       @relation(fields: [salesOrderId], references: [id])
-  spk                  Spk               @relation(fields: [spkId], references: [id], onDelete: Cascade)
-  spk_item_hpp         spk_item_hpp?
-  progressHistory      SpkItemProgress[]
-  spkReturItems        SpkReturItem[]    @relation("OriginalSpkItem")
+  id                  String            @id @default(uuid()) @db.Uuid
+  spkId               String            @db.Uuid
+  salesOrderId        Int?
+  namaBarang          String
+  qty                 Float
+  satuan              String
+  fulfillmentMethod   String            @default("FROM_STOCK")
+  productionRequestId String?           @db.Uuid
+  createdAt           DateTime          @default(now())
+  fulfillmentStatus   String            @default("PENDING")
+  itemId              String?           @db.Uuid
+  updatedAt           DateTime          @updatedAt
+  invoicedQty         Float             @default(0)
+  itemStatus          String            @default("QUEUE")
+  producedQty         Float             @default(0)
+  shippedQty          Float             @default(0)
+  readyQty            Float             @default(0)
+  approvedQty         Float             @default(0)
+  recycledQty         Float             @default(0)
+  productionStatus    String?
+  overproductionChoice String?          
+  invoiceItems        InvoiceItem[]
+  shipping_item       shipping_item[]
+  item                Item?             @relation("ItemToSpkItem", fields: [itemId], references: [id])
+  salesOrder          SalesOrder?       @relation(fields: [salesOrderId], references: [id])
+  spk                 Spk               @relation(fields: [spkId], references: [id], onDelete: Cascade)
+  progressHistory     SpkItemProgress[]
+  returns             ProductReturn[]
+  spkReturItems       SpkReturItem[]    @relation("OriginalSpkItem")
 
   @@map("spk_item")
 }
@@ -191,11 +190,11 @@ model SpkItemProgress {
   spkItemId  String   @db.Uuid
   stage      String
   resultQty  Float
+  unit       String?
   wasteQty   Float    @default(0)
+  wasteUnit  String?
   operatorId String?  @db.Uuid
   createdAt  DateTime @default(now())
-  unit       String?
-  wasteUnit  String?
   spkItem    SpkItem  @relation(fields: [spkItemId], references: [id], onDelete: Cascade)
 
   @@index([spkItemId])
@@ -270,13 +269,12 @@ model Item {
   purchaseOrderItems     PurchaseOrderItem[]
   sales_orders           SalesOrder[]            @relation("ItemToSalesOrder")
   spkItems               SpkItem[]               @relation("ItemToSpkItem")
-  spk_item_hpp_material  spk_item_hpp_material[]
   spkMaterials           SpkMaterialUsage[]      @relation("MaterialToSpk")
-  spkReturItems          SpkReturItem[]
-  spkReturMaterialUsages SpkReturMaterialUsage[]
   stockHistories         StockHistory[]
   transactions           Transaction[]
   wasteStocks            WasteStock[]            @relation("ItemToWaste")
+  spkReturMaterialUsages SpkReturMaterialUsage[]
+  spkReturItems          SpkReturItem[]
 
   @@index([category])
   @@index([productGroup])
@@ -351,6 +349,7 @@ model StockHistory {
 model ProductionRequest {
   id             String                  @id @default(uuid()) @db.Uuid
   spkNumber      String?                 @unique
+  spkReturNumber String?                 @unique
   productName    String
   memo           String
   status         String
@@ -359,13 +358,12 @@ model ProductionRequest {
   updatedAt      DateTime                @updatedAt
   isApproved     Boolean                 @default(false)
   approvedAt     DateTime?
-  spkReturNumber String?                 @unique
   targetItemId   String?                 @db.Uuid
   targetQuantity Float?                  @default(0)
   spk            Spk?                    @relation(fields: [spkNumber], references: [spkNumber])
   spkRetur       SpkRetur?               @relation(fields: [spkReturNumber], references: [spkNumber])
-  targetItem     Item?                   @relation("TargetItemToPR", fields: [targetItemId], references: [id])
   user           User                    @relation(fields: [userId], references: [id])
+  targetItem     Item?                   @relation("TargetItemToPR", fields: [targetItemId], references: [id])
   items          ProductionRequestItem[]
   spkReturItems  SpkReturItem[]
 
@@ -390,29 +388,34 @@ model ProductionRequestItem {
 }
 
 model PurchaseOrder {
-  id                 String                 @id @default(uuid()) @db.Uuid
+  id                 String              @id @default(uuid()) @db.Uuid
   kepada             String
-  nomorPO            String                 @unique
+  nomorPO            String              @unique
   tanggal            DateTime
   jatuhTempo         DateTime
   keteranganTambahan String?
   hormatKami         String?
-  userId             String                 @db.Uuid
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-  spkId              String?                @db.Uuid
-  status             String                 @default("PENDING")
-  isReceived         Boolean                @default(false)
-  paidAmount         Float                  @default(0)
-  paymentMethod      String?
-  paymentStatus      String                 @default("UNPAID")
-  paymentTerm        String?
+  userId             String              @db.Uuid
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  spkId              String?             @db.Uuid
+  status             String              @default("PENDING")
+  
+  // Payment Info
+  paymentMethod      String?             // CASH, INSTALLMENT
+  paymentTerm        String?             // 7, 14, 30, CUSTOM
+  totalAmount        Float               @default(0)
+  paidAmount         Float               @default(0)
+  paymentStatus      String              @default("UNPAID") // UNPAID, PARTIAL, PAID
+
+  // Receipt Info
+  isReceived         Boolean             @default(false)
   receivedAt         DateTime?
-  signatureUrl       String?
   suratJalanUrl      String?
-  totalAmount        Float                  @default(0)
-  spk                Spk?                   @relation(fields: [spkId], references: [id])
-  user               User                   @relation(fields: [userId], references: [id])
+  signatureUrl       String?
+
+  spk                Spk?                @relation(fields: [spkId], references: [id])
+  user               User                @relation(fields: [userId], references: [id])
   items              PurchaseOrderItem[]
   payments           PurchaseOrderPayment[]
 
@@ -433,6 +436,7 @@ model PurchaseOrderPayment {
   notes           String?
   userId          String        @db.Uuid
   createdAt       DateTime      @default(now())
+  
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   user            User          @relation(fields: [userId], references: [id])
 
@@ -442,6 +446,7 @@ model PurchaseOrderPayment {
 model PurchaseOrderItem {
   id              String        @id @default(uuid()) @db.Uuid
   purchaseOrderId String        @db.Uuid
+  itemId          String?       @db.Uuid
   namaBarang      String
   ukuran          String?
   qty             Float
@@ -449,9 +454,8 @@ model PurchaseOrderItem {
   noticeMerkJenis String?
   subTotal        Float
   createdAt       DateTime      @default(now())
-  itemId          String?       @db.Uuid
-  item            Item?         @relation(fields: [itemId], references: [id])
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  item            Item?         @relation(fields: [itemId], references: [id])
 
   @@index([purchaseOrderId])
   @@index([itemId])
@@ -562,6 +566,7 @@ model Shipping {
   id             String          @id @default(uuid()) @db.Uuid
   driverId       String          @db.Uuid
   tglKirim       DateTime        @default(now())
+  estimasi       DateTime?
   catatan        String?
   fotoBuktiUrl   String?
   penerimaNama   String?
@@ -569,7 +574,6 @@ model Shipping {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   catatanSelesai String?
-  estimasi       DateTime?
   driver         User            @relation("DriverToShipping", fields: [driverId], references: [id])
   shipping_item  shipping_item[]
   spks           Spk[]
@@ -590,16 +594,16 @@ model Notification {
 }
 
 model shipping_item {
-  id             String          @id @default(uuid()) @db.Uuid
-  shippingId     String          @db.Uuid
-  spkItemId      String?         @db.Uuid
+  id             String        @id @default(uuid()) @db.Uuid
+  shippingId     String        @db.Uuid
+  spkItemId      String?       @db.Uuid
+  spkReturItemId String?       @db.Uuid
   qty            Float
-  createdAt      DateTime        @default(now())
-  spkReturItemId String?         @db.Uuid
+  createdAt      DateTime      @default(now())
+  shipping       Shipping      @relation(fields: [shippingId], references: [id], onDelete: Cascade)
+  spk_item       SpkItem?      @relation(fields: [spkItemId], references: [id])
+  spk_retur_item SpkReturItem? @relation(fields: [spkReturItemId], references: [id])
   returns        ProductReturn[]
-  shipping       Shipping        @relation(fields: [shippingId], references: [id], onDelete: Cascade)
-  spk_item       SpkItem?        @relation(fields: [spkItemId], references: [id])
-  spk_retur_item SpkReturItem?   @relation(fields: [spkReturItemId], references: [id])
 
   @@index([shippingId])
   @@index([spkItemId])
@@ -607,18 +611,18 @@ model shipping_item {
 }
 
 model ProductReturn {
-  id             String         @id @default(uuid()) @db.Uuid
-  shippingItemId String         @db.Uuid
-  spkItemId      String?        @db.Uuid
+  id             String        @id @default(uuid()) @db.Uuid
+  shippingItemId String        @db.Uuid
+  spkItemId      String?       @db.Uuid
+  spkReturItemId String?       @db.Uuid
   qty            Float
-  reason         String
+  reason         String        // REPACK, RECYCLE, REPAIR
+  isHandled      Boolean       @default(false)
   notes          String?
-  createdAt      DateTime       @default(now())
-  isHandled      Boolean        @default(false)
-  spkReturItemId String?        @db.Uuid
-  shipping_item  shipping_item  @relation(fields: [shippingItemId], references: [id], onDelete: Cascade)
-  spk_item       SpkItem?       @relation(fields: [spkItemId], references: [id])
-  spk_retur_item SpkReturItem?  @relation("ProductReturnOrigin", fields: [spkReturItemId], references: [id])
+  createdAt      DateTime      @default(now())
+  shipping_item  shipping_item @relation(fields: [shippingItemId], references: [id], onDelete: Cascade)
+  spk_item       SpkItem?      @relation(fields: [spkItemId], references: [id])
+  spk_retur_item SpkReturItem? @relation("ProductReturnOrigin", fields: [spkReturItemId], references: [id])
   spkReturItems  SpkReturItem[]
 
   @@index([shippingItemId])
@@ -628,17 +632,17 @@ model ProductReturn {
 }
 
 model SpkRetur {
-  id                String                  @id @default(uuid()) @db.Uuid
-  spkNumber         String                  @unique
-  parentSpkId       String                  @db.Uuid
-  status            String                  @default("QUEUE")
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
-  notes             String?
-  productionRequest ProductionRequest?
-  parentSpk         Spk                     @relation(fields: [parentSpkId], references: [id])
+  id                String             @id @default(uuid()) @db.Uuid
+  spkNumber         String             @unique
+  parentSpkId       String             @db.Uuid
+  parentSpk         Spk                @relation(fields: [parentSpkId], references: [id])
+  status            String             @default("QUEUE") // QUEUE, IN_PROGRESS, DONE
+  notes             String?            @db.Text
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
   returnItems       SpkReturItem[]
   materialUsages    SpkReturMaterialUsage[]
+  productionRequest ProductionRequest?
 
   @@index([parentSpkId])
   @@map("spk_retur")
@@ -647,13 +651,13 @@ model SpkRetur {
 model SpkReturMaterialUsage {
   id             String   @id @default(uuid()) @db.Uuid
   spkReturId     String   @db.Uuid
+  spkRetur       SpkRetur @relation(fields: [spkReturId], references: [id], onDelete: Cascade)
   materialId     String   @db.Uuid
+  material       Item     @relation(fields: [materialId], references: [id])
   quantityNeeded Float
+  remainingQty   Float    @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  remainingQty   Float    @default(0)
-  material       Item     @relation(fields: [materialId], references: [id])
-  spkRetur       SpkRetur @relation(fields: [spkReturId], references: [id], onDelete: Cascade)
 
   @@index([spkReturId])
   @@index([materialId])
@@ -661,106 +665,52 @@ model SpkReturMaterialUsage {
 }
 
 model SpkReturItem {
-  id                   String             @id @default(uuid()) @db.Uuid
-  spkReturId           String             @db.Uuid
-  namaBarang           String
-  qty                  Float
-  satuan               String
-  originalSpkItemId    String?            @db.Uuid
-  productReturnId      String?            @db.Uuid
-  itemStatus           String             @default("QUEUE")
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  approvedQty          Float              @default(0)
-  producedQty          Float              @default(0)
-  readyQty             Float              @default(0)
-  shippedQty           Float              @default(0)
-  invoicedQty          Float              @default(0)
-  fulfillmentMethod    String             @default("PRODUCTION")
-  fulfillmentStatus    String             @default("PENDING")
-  itemId               String?            @db.Uuid
-  productionRequestId  String?            @db.Uuid
+  id                  String               @id @default(uuid()) @db.Uuid
+  spkReturId          String               @db.Uuid
+  spkRetur            SpkRetur             @relation(fields: [spkReturId], references: [id], onDelete: Cascade)
+  namaBarang          String
+  qty                 Float
+  satuan              String
+  fulfillmentMethod   String               @default("PRODUCTION")
+  productionRequestId String?              @db.Uuid
+  itemId              String?              @db.Uuid
+  originalSpkItemId   String?              @db.Uuid
+  originalSpkItem     SpkItem?             @relation("OriginalSpkItem", fields: [originalSpkItemId], references: [id])
+  productReturnId     String?              @db.Uuid
+  productReturn       ProductReturn?       @relation(fields: [productReturnId], references: [id])
+  itemStatus          String               @default("QUEUE")
+  producedQty         Float                @default(0)
+  readyQty            Float                @default(0)
+  shippedQty          Float                @default(0)
+  approvedQty         Float                @default(0)
+  invoicedQty         Float                @default(0)
+  fulfillmentStatus   String               @default("PENDING")
   overproductionChoice String?
-  invoiceItems         InvoiceItem[]
-  originReturns        ProductReturn[]    @relation("ProductReturnOrigin")
-  shipping_item        shipping_item[]
-  spk_item_hpp         spk_item_hpp?
-  item                 Item?              @relation(fields: [itemId], references: [id])
-  originalSpkItem      SpkItem?           @relation("OriginalSpkItem", fields: [originalSpkItemId], references: [id])
-  productReturn        ProductReturn?     @relation(fields: [productReturnId], references: [id])
-  productionRequest    ProductionRequest? @relation(fields: [productionRequestId], references: [id])
-  spkRetur             SpkRetur           @relation(fields: [spkReturId], references: [id], onDelete: Cascade)
-  progressHistory      SpkReturProgress[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  progressHistory     SpkReturProgress[]
+  invoiceItems        InvoiceItem[]
+  productionRequest   ProductionRequest?   @relation(fields: [productionRequestId], references: [id])
+  item                Item?                @relation(fields: [itemId], references: [id])
+  shipping_item       shipping_item[]
+  originReturns       ProductReturn[]      @relation("ProductReturnOrigin")
 
   @@index([spkReturId])
   @@map("spk_retur_item")
 }
 
 model SpkReturProgress {
-  id             String       @id @default(uuid()) @db.Uuid
-  spkReturItemId String       @db.Uuid
-  stage          String
-  resultQty      Float
-  unit           String?
-  wasteQty       Float        @default(0)
-  wasteUnit      String?
-  operatorId     String?      @db.Uuid
-  createdAt      DateTime     @default(now())
-  spkReturItem   SpkReturItem @relation(fields: [spkReturItemId], references: [id], onDelete: Cascade)
+  id              String        @id @default(uuid()) @db.Uuid
+  spkReturItemId  String        @db.Uuid
+  spkReturItem    SpkReturItem  @relation(fields: [spkReturItemId], references: [id], onDelete: Cascade)
+  stage           String
+  resultQty       Float
+  unit            String?
+  wasteQty        Float         @default(0)
+  wasteUnit       String?
+  operatorId      String?       @db.Uuid
+  createdAt       DateTime      @default(now())
 
   @@index([spkReturItemId])
   @@map("spk_retur_item_progress")
-}
-
-model hpp_template {
-  id              String   @id @db.Uuid
-  name            String   @unique
-  listrik         Float    @default(0)
-  operatorBlowing Float    @default(0)
-  operatorCutting Float    @default(0)
-  packing         Float    @default(0)
-  management      Float    @default(0)
-  ongkir          Float    @default(0)
-  cover           Float    @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime
-}
-
-model spk_item_hpp {
-  id                    String                  @id @db.Uuid
-  spkItemId             String?                 @unique @db.Uuid
-  totalBahanBaku        Float                   @default(0)
-  listrik               Float                   @default(0)
-  operatorBlowing       Float                   @default(0)
-  operatorCutting       Float                   @default(0)
-  packing               Float                   @default(0)
-  cover                 Float                   @default(0)
-  management            Float                   @default(0)
-  ongkir                Float                   @default(0)
-  totalHppKeseluruhan   Float                   @default(0)
-  totalHppPerKg         Float                   @default(0)
-  hargaJualPerKg        Float?                  @default(0)
-  profitNominal         Float                   @default(0)
-  profitPersen          Float                   @default(0)
-  createdAt             DateTime                @default(now())
-  updatedAt             DateTime
-  isMergedWithReturn    Boolean                 @default(false)
-  spkReturItemId        String?                 @unique @db.Uuid
-  spk_item              SpkItem?                @relation(fields: [spkItemId], references: [id], onDelete: Cascade)
-  spk_retur_item        SpkReturItem?           @relation(fields: [spkReturItemId], references: [id], onDelete: Cascade)
-  spk_item_hpp_material spk_item_hpp_material[]
-}
-
-model spk_item_hpp_material {
-  id           String       @id @db.Uuid
-  spkItemHppId String       @db.Uuid
-  materialId   String       @db.Uuid
-  quantityUsed Float
-  hargaSatuan  Float
-  createdAt    DateTime     @default(now())
-  Item         Item         @relation(fields: [materialId], references: [id])
-  spk_item_hpp spk_item_hpp @relation(fields: [spkItemHppId], references: [id], onDelete: Cascade)
-
-  @@index([materialId])
-  @@index([spkItemHppId])
 }

@@ -74,15 +74,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     localStorage.setItem("theme", next ? "dark" : "light");
   };
 
-  const { 
-    user, 
-    notifications, 
-    counts, 
-    audioUnlocked, 
-    audioBlocked, 
-    unlockAudio, 
+  const {
+    user,
+    notifications,
+    counts,
+    audioUnlocked,
+    audioBlocked,
+    unlockAudio,
     markAsRead,
-    logout
+    logout,
   } = useNotifications();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -279,7 +279,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
   };
 
-
   // Auto expand menu jika pathname aktif
   useEffect(() => {
     const activeMenu = menuItems.find((item) => {
@@ -301,7 +300,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [pathname]);
 
-
   const toggleMenu = (href: string) => {
     if (expandedMenus.includes(href)) {
       setExpandedMenus(expandedMenus.filter((h: string) => h !== href));
@@ -322,15 +320,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const getMenuItemsWithBadges = () => {
     const rawRole = (currentUser.role || "").toUpperCase();
-    const isSuper = rawRole === UserRole.SUPERADMIN || rawRole === UserRole.FOUNDER;
+    const isSuper =
+      rawRole === UserRole.SUPERADMIN || rawRole === UserRole.FOUNDER;
     const isKepala = rawRole === UserRole.KEPALA_INVENTORY;
     const isAdmin = rawRole === "ADMIN";
     const isDriver = rawRole === "DRIVER";
-    const isLoading = currentUser.id === "loading" || !currentUser.role || currentUser.role === "...";
+    const isLoading =
+      currentUser.id === "loading" ||
+      !currentUser.role ||
+      currentUser.role === "...";
 
     return menuItems
       .filter((item) => {
-        if (isLoading) return item.href === "/dashboard" || item.href === "/tentang-aplikasi";
+        if (isLoading)
+          return (
+            item.href === "/dashboard" || item.href === "/tentang-aplikasi"
+          );
         if (isSuper) return true;
         if (isKepala) {
           return item.href !== "/approval-barang-jadi";
@@ -345,7 +350,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           return allowed.includes(item.href);
         }
         if (isDriver) {
-          return ["/dashboard", "/shipping", "/tentang-aplikasi"].includes(item.href);
+          return ["/dashboard", "/shipping", "/tentang-aplikasi"].includes(
+            item.href,
+          );
         }
         return item.href === "/dashboard"; // Safe fallback
       })
@@ -372,69 +379,70 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             .map((child) => ({ ...child }));
         }
 
-      // Assign badges to specific children
-      if (newItem.title === "Transaksi") {
-        const poChild = newItem.children?.find(
-          (c: MenuChildItem) => c.title === "Purchase Order",
-        );
-        const wasteChild = newItem.children?.find(
-          (c: MenuChildItem) => c.title === "Monitoring Waste",
-        );
-        if (poChild) poChild.badge = counts.purchaseOrder;
-        if (wasteChild) wasteChild.badge = counts.waste;
-      }
-
-      if (newItem.title === "Permintaan Produksi") {
-        const daftarChild = newItem.children?.find(
-          (c: MenuChildItem) => c.title === "Daftar Permintaan",
-        );
-        const approvalChild = newItem.children?.find(
-          (c: MenuChildItem) => c.title === "Approval",
-        );
-
-        if (daftarChild) {
-          daftarChild.badge = counts.productionRequest;
-          daftarChild.returBadge = counts.productionRetur;
-        }
-        if (approvalChild) {
-          approvalChild.badge = counts.productionApprovalNormal;
-          approvalChild.returBadge = counts.productionApprovalRetur;
-        }
-      }
-
-      if (newItem.title === "Approval Produksi") {
-        newItem.badge = counts.gudangApproval;
-        newItem.returBadge = counts.gudangRetur;
-      }
-
-      if (newItem.title === "Pengiriman") {
-        newItem.badge = counts.shippingReady;
-        newItem.returBadge = counts.shippingRetur;
-      }
-
-      // AGGREGATION LOGIC: If a parent has children with badges, sum them up for the parent badge
-      if (newItem.children && newItem.children.length > 0) {
-        const totalChildrenBadge = newItem.children.reduce(
-          (sum, child) => sum + (child.badge || 0),
-          0,
-        );
-        
-        // Only set parent badge if it doesn't already have one (or combine them)
-        if (totalChildrenBadge > 0) {
-          newItem.badge = (newItem.badge || 0) + totalChildrenBadge;
+        // Assign badges to specific children
+        if (newItem.title === "Transaksi") {
+          const poChild = newItem.children?.find(
+            (c: MenuChildItem) => c.title === "Purchase Order",
+          );
+          const wasteChild = newItem.children?.find(
+            (c: MenuChildItem) => c.title === "Monitoring Waste",
+          );
+          if (poChild) poChild.badge = counts.purchaseOrder;
+          if (wasteChild) wasteChild.badge = counts.waste;
         }
 
-        const totalChildrenReturBadge = newItem.children.reduce(
-          (sum, child) => sum + (child.returBadge || 0),
-          0,
-        );
-        if (totalChildrenReturBadge > 0) {
-          newItem.returBadge = (newItem.returBadge || 0) + totalChildrenReturBadge;
-        }
-      }
+        if (newItem.title === "Permintaan Produksi") {
+          const daftarChild = newItem.children?.find(
+            (c: MenuChildItem) => c.title === "Daftar Permintaan",
+          );
+          const approvalChild = newItem.children?.find(
+            (c: MenuChildItem) => c.title === "Approval",
+          );
 
-      return newItem;
-    });
+          if (daftarChild) {
+            daftarChild.badge = counts.productionRequest;
+            daftarChild.returBadge = counts.productionRetur;
+          }
+          if (approvalChild) {
+            approvalChild.badge = counts.productionApprovalNormal;
+            approvalChild.returBadge = counts.productionApprovalRetur;
+          }
+        }
+
+        if (newItem.title === "Approval Produksi") {
+          newItem.badge = counts.gudangApproval;
+          newItem.returBadge = counts.gudangRetur;
+        }
+
+        if (newItem.title === "Pengiriman") {
+          newItem.badge = counts.shippingReady;
+          newItem.returBadge = counts.shippingRetur;
+        }
+
+        // AGGREGATION LOGIC: If a parent has children with badges, sum them up for the parent badge
+        if (newItem.children && newItem.children.length > 0) {
+          const totalChildrenBadge = newItem.children.reduce(
+            (sum, child) => sum + (child.badge || 0),
+            0,
+          );
+
+          // Only set parent badge if it doesn't already have one (or combine them)
+          if (totalChildrenBadge > 0) {
+            newItem.badge = (newItem.badge || 0) + totalChildrenBadge;
+          }
+
+          const totalChildrenReturBadge = newItem.children.reduce(
+            (sum, child) => sum + (child.returBadge || 0),
+            0,
+          );
+          if (totalChildrenReturBadge > 0) {
+            newItem.returBadge =
+              (newItem.returBadge || 0) + totalChildrenReturBadge;
+          }
+        }
+
+        return newItem;
+      });
   };
 
   return (
@@ -742,16 +750,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <button
                   onClick={unlockAudio}
                   className={`p-2 rounded-xl transition-all flex items-center gap-2 ${
-                    audioBlocked 
-                      ? "bg-red-50 text-red-500 animate-pulse hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400" 
+                    audioBlocked
+                      ? "bg-red-50 text-red-500 animate-pulse hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400"
                       : !audioUnlocked
                         ? "bg-amber-50 text-amber-500 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400"
                         : "text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-slate-800"
                   }`}
-                  title={audioBlocked ? "Suara Terblokir! Klik untuk aktifkan" : audioUnlocked ? "Suara Aktif" : "Klik untuk aktifkan suara"}
+                  title={
+                    audioBlocked
+                      ? "Suara Terblokir! Klik untuk aktifkan"
+                      : audioUnlocked
+                        ? "Suara Aktif"
+                        : "Klik untuk aktifkan suara"
+                  }
                 >
                   {audioBlocked ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                  {(audioBlocked || !audioUnlocked) && <span className="text-[10px] font-bold hidden sm:inline uppercase tracking-wider">{audioBlocked ? "Sound Muted" : "Unlock Audio"}</span>}
+                  {(audioBlocked || !audioUnlocked) && (
+                    <span className="text-[10px] font-bold hidden sm:inline uppercase tracking-wider">
+                      {audioBlocked ? "Sound Muted" : "Unlock Audio"}
+                    </span>
+                  )}
                 </button>
 
                 {/* Notifications */}
@@ -977,8 +995,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <footer className="hidden lg:block bg-white dark:bg-slate-950 border-t border-gray-200 dark:border-gray-800 py-4 px-6 transition-colors print:hidden">
             <div className="flex items-center justify-between">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                © {new Date().getFullYear()} Inventory Management System. All
-                rights reserved.
+                © {new Date().getFullYear()} Inventory Management System by
+                Associe IT. All rights reserved.
               </p>
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <Warehouse size={16} className="text-blue-600" />

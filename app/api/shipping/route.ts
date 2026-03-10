@@ -291,13 +291,20 @@ export async function PATCH(request: NextRequest) {
              }
            }
 
-           if (effectiveQty > 0) {
-             if (targetItem.fulfillmentMethod === "FROM_STOCK") {
-               await fulfillReservedStock(targetItem.itemId, effectiveQty, authUser.userId, memo, transaction.id, tx);
-             } else {
-               await updateStock(targetItem.itemId, effectiveQty, "KELUAR" as any, authUser.userId, memo, transaction.id, tx);
-             }
-           }
+            if (targetItem.fulfillmentMethod === "FROM_STOCK") {
+              if (effectiveQty > 0) {
+                await fulfillReservedStock(targetItem.itemId, effectiveQty, authUser.userId, memo, transaction.id, tx);
+              }
+            } else if (targetItem.fulfillmentMethod === "PRODUCTION") {
+              // Production items don't affect general stock ledger
+              // We already recorded the Transaction above for history
+              console.log(`[SHIPPING_LOG] Skipping stock update for PRODUCTION item: ${targetItem.namaBarang}`);
+            } else {
+              // TRADING or other methods might still use general stock
+              if (effectiveQty > 0) {
+                await updateStock(targetItem.itemId, effectiveQty, "KELUAR" as any, authUser.userId, memo, transaction.id, tx);
+              }
+            }
         }
 
         const finishedShippingItems = await tx.shipping_item.findMany({

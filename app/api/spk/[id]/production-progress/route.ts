@@ -116,9 +116,24 @@ export async function POST(
         });
       }
 
-      // 3.1) Update Physical Stock & Record Transaction
-      if (itemId) {
-        const memo = `Hasil produksi masuk: ${item.namaBarang} (${isRetur ? "SPK Retur" : "SPK"} #${spkId.substring(0, 8)})`;
+      // 3.1) Update Physical Stock & Record Transaction ONLY for Manual Production
+      // SPK-based production does NOT enter general stock (it stays in readyQty)
+      const isManual = !spkId || (!isRetur && spkId.startsWith("manual-")); // Placeholder logic for now
+      
+      // Better: Check if the PR linked to this item is manual
+      let isPRManual = false;
+      if (item.productionRequestId) {
+        const pr = await tx.productionRequest.findUnique({
+          where: { id: item.productionRequestId },
+          select: { spkNumber: true, spkReturNumber: true }
+        });
+        if (pr && !pr.spkNumber && !pr.spkReturNumber) {
+          isPRManual = true;
+        }
+      }
+
+      if (itemId && isPRManual) {
+        const memo = `Hasil produksi masuk (Manual): ${item.namaBarang}`;
         const transaction = await tx.transaction.create({
           data: {
             date: new Date(),

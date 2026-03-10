@@ -83,7 +83,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const fetchCounts = async () => {
     try {
-      const res = await fetch("/api/notifications/counts");
+      // Add timestamp to bypass any browser or router caching
+      const res = await fetch(`/api/notifications/counts?t=${Date.now()}`);
       const data = await res.json();
       if (data && !data.error) {
         setCounts(data);
@@ -319,6 +320,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // Polling fallback to ensure badges are up to date even if Supabase triggers are missed
+  useEffect(() => {
+    if (!user) return;
+    
+    const interval = setInterval(() => {
+      fetchCounts();
+    }, 30000); // Poll every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [user]);
 
   return (
     <NotificationContext.Provider

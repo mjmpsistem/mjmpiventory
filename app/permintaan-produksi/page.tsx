@@ -127,6 +127,7 @@ export default function PermintaanProduksiPage() {
   const [selectedRequestForPrint, setSelectedRequestForPrint] =
     useState<ProductionRequest | null>(null);
   const [filterStatus, setFilterStatus] = useState("");
+  const [finishedGoods, setFinishedGoods] = useState<Item[]>([]);
 
   const [activeTab, setActiveTab] = useState<"needed" | "history">("needed");
   const [searchQuery, setSearchQuery] = useState("");
@@ -134,10 +135,13 @@ export default function PermintaanProduksiPage() {
   const [endDate, setEndDate] = useState("");
 
   const [formData, setFormData] = useState({
-    id: "" as string | null, // Tambahkan ID untuk mode edit
+    id: "" as string | null,
     spkNumber: "",
     products: [] as string[],
     memo: "",
+    targetItemId: "",
+    targetQuantity: 0,
+    isManual: false,
     items: [] as Array<{
       itemId: string;
       quantity: number;
@@ -193,7 +197,18 @@ export default function PermintaanProduksiPage() {
     fetchRequests();
     fetchSpksNeedingProduction();
     fetchItems();
+    fetchFinishedGoods();
   }, [filterStatus]);
+
+  const fetchFinishedGoods = async () => {
+    try {
+      const res = await fetch("/api/items?category=BARANG_JADI&isActive=true");
+      const data = await res.json();
+      setFinishedGoods(data.items || []);
+    } catch (error) {
+      console.error("Error fetching finished goods:", error);
+    }
+  };
 
   const fetchRequests = async () => {
     try {
@@ -333,6 +348,9 @@ export default function PermintaanProduksiPage() {
           spkNumber: "",
           products: [],
           memo: "",
+          targetItemId: "",
+          targetQuantity: 0,
+          isManual: false,
           items: [],
         });
         toast.success(isEdit ? "Permintaan diperbarui" : "Permintaan dibuat");
@@ -464,6 +482,9 @@ export default function PermintaanProduksiPage() {
                   spkNumber: "",
                   products: [""],
                   memo: "",
+                  targetItemId: "",
+                  targetQuantity: 0,
+                  isManual: true,
                   items: [],
                 });
                 setShowModal(true);
@@ -657,6 +678,9 @@ export default function PermintaanProduksiPage() {
                             memo:
                               spk.catatan ||
                               `Produksi untuk SPK ${spk.spkNumber}`,
+                            targetItemId: "",
+                            targetQuantity: 0,
+                            isManual: false,
                             items: initialItems,
                           });
                           setShowModal(true);
@@ -861,6 +885,9 @@ export default function PermintaanProduksiPage() {
                                 spkNumber: spkIdentifier || "",
                                 products: productsArr,
                                 memo: request.memo,
+                                targetItemId: (request as any).targetItem?.id || "",
+                                targetQuantity: (request as any).targetQuantity || 0,
+                                isManual: !!(request as any).targetItem?.id,
                                 items: request.items.map((item) => ({
                                   itemId: item.item.id,
                                   quantity: item.quantity,
@@ -956,6 +983,9 @@ export default function PermintaanProduksiPage() {
                       spkNumber: "",
                       products: [],
                       memo: "",
+                      targetItemId: "",
+                      targetQuantity: 0,
+                      isManual: false,
                       items: [],
                     });
                   }}
@@ -968,19 +998,69 @@ export default function PermintaanProduksiPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nomor SPK *
+                      Nomor SPK {formData.targetItemId ? "(Opsional)" : "*"}
                     </label>
                     <input
                       type="text"
-                      required
+                      required={!formData.targetItemId}
                       value={formData.spkNumber}
                       onChange={(e) =>
                         setFormData({ ...formData, spkNumber: e.target.value })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Contoh: SPK-2024-001"
+                      placeholder="Contoh: SPK-20240101-001"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
                     />
                   </div>
+
+                   {formData.isManual && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Target Barang Jadi (Opsional)
+                      </label>
+                      <select
+                        value={formData.targetItemId}
+                        onChange={(e) => {
+                          const targetId = e.target.value;
+                          const item = finishedGoods.find((i) => i.id === targetId);
+                          setFormData({
+                            ...formData,
+                            targetItemId: targetId,
+                            products: item ? [item.name] : formData.products,
+                          });
+                        }}
+                        className="w-full h-11 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      >
+                        <option value="">-- Pilih Barang Jadi --</option>
+                        {finishedGoods.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name} ({item.currentStock} {item.unit.name})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {formData.isManual && formData.targetItemId && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Kuantitas Target *
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        required={!!formData.targetItemId}
+                        value={formData.targetQuantity || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            targetQuantity: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  )}
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <label className="block text-sm font-medium text-gray-700">
@@ -1236,6 +1316,9 @@ export default function PermintaanProduksiPage() {
                         spkNumber: "",
                         products: [],
                         memo: "",
+                        targetItemId: "",
+                        targetQuantity: 0,
+                        isManual: false,
                         items: [],
                       });
                     }}
