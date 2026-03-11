@@ -34,6 +34,12 @@ import Layout from "@/components/Layout";
 import Breadcrumb from "@/components/Breadcrumb";
 import { formatDate } from "@/lib/utils";
 
+const ensureAbsoluteUrl = (url: string) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `https://${url}`;
+};
+
 export default function ShippingPage() {
   const [activeTab, setActiveTab] = useState("ready");
   const [search, setSearch] = useState("");
@@ -436,6 +442,21 @@ export default function ShippingPage() {
                        <span className="font-semibold text-gray-700 dark:text-gray-300">{item.lead?.nama_toko}</span>
                        <span>•</span>
                        <span>{formatDate(item.updatedAt)}</span>
+                       {item.lead?.alamat_gmaps && (
+                         <>
+                           <span>•</span>
+                           <a 
+                             href={ensureAbsoluteUrl(item.lead.alamat_gmaps)} 
+                             target="_blank" 
+                             rel="noopener noreferrer"
+                             className="text-blue-500 hover:text-blue-600 flex items-center gap-0.5 font-bold animate-pulse hover:animate-none"
+                             onClick={(e) => e.stopPropagation()}
+                           >
+                             <MapPin size={12} />
+                             <span>Maps</span>
+                           </a>
+                         </>
+                       )}
                     </div>
                   </div>
 
@@ -507,10 +528,24 @@ export default function ShippingPage() {
                             <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
                               <MapPin size={10} /> Titik Pengiriman
                             </h4>
-                            <div className="bg-gray-50 dark:bg-slate-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">
-                              <p className="text-sm font-semibold">{item.lead?.nama_pic}</p>
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{item.lead?.alamat_toko}</p>
-                            </div>
+                             <div className="bg-gray-50 dark:bg-slate-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800 flex justify-between items-start gap-4">
+                               <div>
+                                 <p className="text-sm font-semibold">{item.lead?.nama_pic}</p>
+                                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{item.lead?.alamat_toko}</p>
+                               </div>
+                               {item.lead?.alamat_gmaps && (
+                                 <a 
+                                   href={ensureAbsoluteUrl(item.lead.alamat_gmaps)}
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   className="shrink-0 p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-all border border-blue-100 flex flex-col items-center gap-1 group"
+                                   title="Buka di Google Maps"
+                                 >
+                                   <ExternalLink size={16} className="group-hover:scale-110 transition-transform" />
+                                   <span className="text-[9px] font-black uppercase">Maps</span>
+                                 </a>
+                               )}
+                             </div>
                           </div>
 
                           {activeTab !== "ready" && item.shipping && (
